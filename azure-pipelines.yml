@@ -23,7 +23,7 @@ stages:
       - job: CreateBranchInAllRepos
         displayName: 'Create branch across repo-1 to repo-10'
         pool:
-          name: 'agent1'
+          name: 'Default'
         steps:
           - task: PowerShell@2
             displayName: 'Create branch in all 10 repos'
