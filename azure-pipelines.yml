@@ -11,6 +11,20 @@ parameters:
     displayName: 'GitHub owner/username'
     type: string
     default: 'raghuramgadhamsetty'
+  - name: stageRegion
+    displayName: 'Stage deploy region'
+    type: string
+    default: 'east'
+    values:
+      - east
+      - west
+  - name: prodRegion
+    displayName: 'Prod deploy region'
+    type: string
+    default: 'east'
+    values:
+      - east
+      - west
 
 variables:
   - name: repoList
@@ -182,52 +196,44 @@ stages:
                     artifactName: 'ci-build-info'
                     publishLocation: 'pipeline'
 
-  - stage: stage_east_deploy
-    displayName: 'Stage East Deploy'
+  # Stage deploy: only east OR west runs based on stageRegion parameter
+  - stage: StageDeploy
+    displayName: 'Stage Deploy'
     dependsOn: GatherCIBuildInfo
     jobs:
-      - job: DeployEast
+      - job: DeployStageEast
         displayName: 'Deploy to Stage East'
+        condition: ${{ eq(parameters.stageRegion, 'east') }}
         pool:
           name: 'Default'
         steps:
           - script: echo "Dummy stage-east-deploy - deploy to East region"
             displayName: 'Stage East Deploy'
-
-  - stage: stage_west_deploy
-    displayName: 'Stage West Deploy'
-    dependsOn: GatherCIBuildInfo
-    jobs:
-      - job: DeployWest
+      - job: DeployStageWest
         displayName: 'Deploy to Stage West'
+        condition: ${{ eq(parameters.stageRegion, 'west') }}
         pool:
           name: 'Default'
         steps:
           - script: echo "Dummy stage-west-deploy - deploy to West region"
             displayName: 'Stage West Deploy'
 
-  - stage: prod_east_deploy
-    displayName: 'Prod East Deploy'
-    dependsOn:
-      - stage_east_deploy
-      - stage_west_deploy
+  # Prod deploy: only east OR west runs based on prodRegion parameter
+  - stage: ProdDeploy
+    displayName: 'Prod Deploy'
+    dependsOn: StageDeploy
     jobs:
       - job: DeployProdEast
         displayName: 'Deploy to Prod East'
+        condition: ${{ eq(parameters.prodRegion, 'east') }}
         pool:
           name: 'Default'
         steps:
           - script: echo "Dummy prod-east-deploy - deploy to Prod East region"
             displayName: 'Prod East Deploy'
-
-  - stage: prod_west_deploy
-    displayName: 'Prod West Deploy'
-    dependsOn:
-      - stage_east_deploy
-      - stage_west_deploy
-    jobs:
       - job: DeployProdWest
         displayName: 'Deploy to Prod West'
+        condition: ${{ eq(parameters.prodRegion, 'west') }}
         pool:
           name: 'Default'
         steps:
