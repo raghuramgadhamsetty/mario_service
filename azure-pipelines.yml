@@ -1,0 +1,55 @@
+# Pipeline: Create a branch in all 10 GitHub repos (repo-1 through repo-10)
+# Run this pipeline and provide the branch name when prompted.
+
+trigger: none
+
+parameters:
+  - name: branchName
+    displayName: 'Branch name to create'
+    type: string
+  - name: githubOwner
+    displayName: 'GitHub owner/username'
+    type: string
+    default: 'raghuramgadhamsetty'
+
+variables:
+  - name: repoList
+    value: 'repo-1,repo-2,repo-3,repo-4,repo-5,repo-6,repo-7,repo-8,repo-9,repo-10'
+
+stages:
+  - stage: CreateBranch
+    displayName: 'Create branch in all repos'
+    jobs:
+      - job: CreateBranchInAllRepos
+        displayName: 'Create branch across repo-1 to repo-10'
+        pool:
+          vmImage: 'ubuntu-latest'
+        steps:
+          - task: PowerShell@2
+            displayName: 'Create branch in all 10 repos'
+            env:
+              GITHUB_TOKEN: $(GITHUB_TOKEN)
+            inputs:
+              targetType: 'inline'
+              script: |
+                $ErrorActionPreference = "Stop"
+                $branchName = "${{ parameters.branchName }}"
+                $owner = "${{ parameters.githubOwner }}"
+                $repos = @("repo-1","repo-2","repo-3","repo-4","repo-5","repo-6","repo-7","repo-8","repo-9","repo-10")
+                $baseUrl = "https://api.github.com"
+
+                if (-not $env:GITHUB_TOKEN) {
+                  Write-Error "GITHUB_TOKEN is not set. Add a secret pipeline variable named GITHUB_TOKEN with your GitHub PAT (scope: repo)."
+                }
+                if (-not $branchName) {
+                  Write-Error "Branch name is required. Run the pipeline with the branchName parameter."
+                }
+
+                $headers = @{
+                  "Authorization" = "token $($env:GITHUB_TOKEN)"
+                  "Accept"        = "application/vnd.github.v3+json"
+                }
+
+                foreach ($repo in $repos) {
+                  try {
+                    # Get default branch and its
