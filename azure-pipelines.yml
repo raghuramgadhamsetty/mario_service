@@ -17,6 +17,8 @@ parameters:
     values:
       - main
       - master
+      - NA
+      - NA
   - name: githubOwner
     displayName: 'GitHub owner/username'
     type: string
