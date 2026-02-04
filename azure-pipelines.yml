@@ -181,3 +181,73 @@ stages:
                     targetPath: '$(Build.ArtifactStagingDirectory)/ci-build-info'
                     artifactName: 'ci-build-info'
                     publishLocation: 'pipeline'
+
+  # Deploy stages - each requires approval before running
+  # Create environment 'deploy-approval' in DevOps (Pipelines > Environments) and add Approvals
+  - stage: stage_east_deploy
+    displayName: 'Stage East Deploy'
+    dependsOn: GatherCIBuildInfo
+    jobs:
+      - deployment: DeployStageEast
+        displayName: 'Deploy to Stage East'
+        environment: 'deploy-approval'
+        pool:
+          name: 'Default'
+        strategy:
+          runOnce:
+            deploy:
+              steps:
+                - script: echo "Dummy stage-east-deploy - deploy to East region"
+                  displayName: 'Stage East Deploy'
+
+  - stage: stage_west_deploy
+    displayName: 'Stage West Deploy'
+    dependsOn: GatherCIBuildInfo
+    jobs:
+      - deployment: DeployStageWest
+        displayName: 'Deploy to Stage West'
+        environment: 'deploy-approval'
+        pool:
+          name: 'Default'
+        strategy:
+          runOnce:
+            deploy:
+              steps:
+                - script: echo "Dummy stage-west-deploy - deploy to West region"
+                  displayName: 'Stage West Deploy'
+
+  - stage: prod_east_deploy
+    displayName: 'Prod East Deploy'
+    dependsOn:
+      - stage_east_deploy
+      - stage_west_deploy
+    jobs:
+      - deployment: DeployProdEast
+        displayName: 'Deploy to Prod East'
+        environment: 'deploy-approval'
+        pool:
+          name: 'Default'
+        strategy:
+          runOnce:
+            deploy:
+              steps:
+                - script: echo "Dummy prod-east-deploy - deploy to Prod East region"
+                  displayName: 'Prod East Deploy'
+
+  - stage: prod_west_deploy
+    displayName: 'Prod West Deploy'
+    dependsOn:
+      - stage_east_deploy
+      - stage_west_deploy
+    jobs:
+      - deployment: DeployProdWest
+        displayName: 'Deploy to Prod West'
+        environment: 'deploy-approval'
+        pool:
+          name: 'Default'
+        strategy:
+          runOnce:
+            deploy:
+              steps:
+                - script: echo "Dummy prod-west-deploy - deploy to Prod West region"
+                  displayName: 'Prod West Deploy'
