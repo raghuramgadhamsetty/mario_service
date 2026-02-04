@@ -7,6 +7,9 @@ parameters:
   - name: branchName
     displayName: 'Branch name to create'
     type: string
+  - name: prevReleaseBranch
+    displayName: 'Previous release branch (create new branch from this)'
+    type: string
   - name: githubOwner
     displayName: 'GitHub owner/username'
     type: string
@@ -27,6 +30,7 @@ stages:
         steps:
           - script: |
               echo "Branch name: ${{ parameters.branchName }}"
+              echo "Previous release branch: ${{ parameters.prevReleaseBranch }}"
               echo "GitHub owner: ${{ parameters.githubOwner }}"
             displayName: 'Show parameters'
 
@@ -48,6 +52,7 @@ stages:
               script: |
                 $ErrorActionPreference = "Stop"
                 $branchName = "${{ parameters.branchName }}"
+                $prevReleaseBranch = "${{ parameters.prevReleaseBranch }}"
                 $owner = "${{ parameters.githubOwner }}"
                 $repos = @("repo-1","repo-2","repo-3","repo-4","repo-5","repo-6","repo-7","repo-8","repo-9","repo-10")
                 $baseUrl = "https://api.github.com"
@@ -58,6 +63,9 @@ stages:
                 if (-not $branchName) {
                   Write-Error "Branch name is required. Run the pipeline with the branchName parameter."
                 }
+                if (-not $prevReleaseBranch) {
+                  Write-Error "Previous release branch is required. Run the pipeline with the prevReleaseBranch parameter."
+                }
 
                 $headers = @{
                   "Authorization" = "token $($env:GITHUB_TOKEN)"
@@ -66,13 +74,20 @@ stages:
 
                 foreach ($repo in $repos) {
                   try {
-                    # Get default branch and its SHA
-                    $repoInfo = Invoke-RestMethod -Uri "$baseUrl/repos/$owner/$repo" -Headers $headers -Method Get
-                    $defaultBranch = $repoInfo.default_branch
-                    $refInfo = Invoke-RestMethod -Uri "$baseUrl/repos/$owner/$repo/git/ref/heads/$defaultBranch" -Headers $headers -Method Get
+                    # Get previous release branch SHA - fail if branch does not exist
+                    $ref = "heads/" + [System.Uri]::EscapeDataString($prevReleaseBranch)
+                    $refInfo = Invoke-RestMethod -Uri "$baseUrl/repos/$owner/$repo/git/ref/$ref" -Headers $headers -Method Get
                     $sha = $refInfo.object.sha
+                  } catch {
+                    if ($_.Exception.Response.StatusCode -eq 404) {
+                      Write-Error "Previous branch '$prevReleaseBranch' does not exist in $repo. Pipeline failed."
+                    } else {
+                      throw $_
+                    }
+                  }
 
-                    # Create new branch
+                  try {
+                    # Create new branch from previous release
                     $body = @{ ref = "refs/heads/$branchName"; sha = $sha } | ConvertTo-Json
                     Invoke-RestMethod -Uri "$baseUrl/repos/$owner/$repo/git/refs" -Headers $headers -Method Post -Body $body -ContentType "application/json"
                     Write-Host "Created branch '$branchName' in $repo" -ForegroundColor Green
@@ -110,6 +125,7 @@ stages:
                     script: |
                       $ErrorActionPreference = "Stop"
                       $owner = "${{ parameters.githubOwner }}"
+                      $branchName = "${{ parameters.branchName }}"
                       $repos = @("repo-1","repo-2","repo-3","repo-4","repo-5","repo-6","repo-7","repo-8","repo-9","repo-10")
                       $baseUrl = "https://api.github.com"
                       $outputLines = @()
@@ -123,22 +139,24 @@ stages:
                         "Accept"        = "application/vnd.github.v3+json"
                       }
 
+                      $branchEncoded = [System.Uri]::EscapeDataString($branchName)
+
                       foreach ($repo in $repos) {
                         try {
                           # Get workflow id for CI (ci.yml)
                           $workflows = Invoke-RestMethod -Uri "$baseUrl/repos/$owner/$repo/actions/workflows" -Headers $headers -Method Get
                           $ciWorkflow = $workflows.workflows | Where-Object { $_.path -like "*ci.yml" } | Select-Object -First 1
                           if (-not $ciWorkflow) {
-                            $outputLines += "$repo - no CI workflow found"
-                            Write-Host "$repo - no CI workflow found" -ForegroundColor Yellow
+                            $outputLines += "$repo - NA"
+                            Write-Host "$repo - NA (no CI workflow)" -ForegroundColor Yellow
                             continue
                           }
                           $workflowId = $ciWorkflow.id
-                          # Get latest CI workflow runs
-                          $runs = Invoke-RestMethod -Uri "$baseUrl/repos/$owner/$repo/actions/workflows/$workflowId/runs?per_page=1" -Headers $headers -Method Get
+                          # Get latest CI workflow runs for the newly created branch only
+                          $runs = Invoke-RestMethod -Uri "$baseUrl/repos/$owner/$repo/actions/workflows/$workflowId/runs?branch=$branchEncoded&per_page=1" -Headers $headers -Method Get
                           if (-not $runs.workflow_runs -or $runs.workflow_runs.Count -eq 0) {
-                            $outputLines += "$repo - no CI run found"
-                            Write-Host "$repo - no CI run found" -ForegroundColor Yellow
+                            $outputLines += "$repo - NA"
+                            Write-Host "$repo - NA (no CI run on branch $branchName)" -ForegroundColor Yellow
                             continue
                           }
                           $latestRun = $runs.workflow_runs[0]
@@ -146,9 +164,9 @@ stages:
                           $runStatus = $latestRun.status
                           $runConclusion = $latestRun.conclusion
 
-                          # Get artifacts for latest run
+                          # Get artifacts for latest run on this branch
                           $artifacts = Invoke-RestMethod -Uri "$baseUrl/repos/$owner/$repo/actions/runs/$runId/artifacts" -Headers $headers -Method Get
-                          $buildVersion = "no artifact"
+                          $buildVersion = "NA"
                           if ($artifacts.artifacts -and $artifacts.artifacts.Count -gt 0) {
                             $buildArtifact = $artifacts.artifacts | Where-Object { $_.name -match "^build-" } | Select-Object -First 1
                             if ($buildArtifact) {
@@ -162,7 +180,7 @@ stages:
                           $outputLines += $line
                           Write-Host "$line (run: $runId, status: $runStatus, conclusion: $runConclusion)" -ForegroundColor Green
                         } catch {
-                          $outputLines += "$repo - error: $($_.Exception.Message)"
+                          $outputLines += "$repo - NA"
                           Write-Host "Failed for $repo : $_" -ForegroundColor Red
                         }
                       }
@@ -182,15 +200,15 @@ stages:
                     artifactName: 'ci-build-info'
                     publishLocation: 'pipeline'
 
-  # Deploy stages - each requires approval before running
-  # Create environment 'deploy-approval' in DevOps (Pipelines > Environments) and add Approvals
+  # Deploy stages - each has its own approval (create 4 environments in DevOps)
+  # deploy-stage-east, deploy-stage-west, deploy-prod-east, deploy-prod-west
   - stage: stage_east_deploy
     displayName: 'Stage East Deploy'
     dependsOn: GatherCIBuildInfo
     jobs:
       - deployment: DeployStageEast
         displayName: 'Deploy to Stage East'
-        environment: 'deploy-approval'
+        environment: 'deploy-stage-east'
         pool:
           name: 'Default'
         strategy:
@@ -206,7 +224,7 @@ stages:
     jobs:
       - deployment: DeployStageWest
         displayName: 'Deploy to Stage West'
-        environment: 'deploy-approval'
+        environment: 'deploy-stage-west'
         pool:
           name: 'Default'
         strategy:
@@ -224,7 +242,7 @@ stages:
     jobs:
       - deployment: DeployProdEast
         displayName: 'Deploy to Prod East'
-        environment: 'deploy-approval'
+        environment: 'deploy-prod-east'
         pool:
           name: 'Default'
         strategy:
@@ -242,7 +260,7 @@ stages:
     jobs:
       - deployment: DeployProdWest
         displayName: 'Deploy to Prod West'
-        environment: 'deploy-approval'
+        environment: 'deploy-prod-west'
         pool:
           name: 'Default'
         strategy:
