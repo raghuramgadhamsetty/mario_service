@@ -8,12 +8,11 @@ trigger: none
 
 parameters:
   - name: PrevReleaseBranch
-    displayName: 'Branch name for artifacts to be pickedup'
+    displayName: 'Branch name to create'
     type: string
   - name: Components
-    displayName: 'select Components need to deployed'
+    displayName: 'Previous release branch (create new branch from this)'
     type: stringList
-    default: main
     values:
       - ApplicationComponent1
       - ApplicationComponent2
@@ -30,10 +29,29 @@ parameters:
     type: string
     default: 'raghuramgadhamsetty'
 
-  # Stage 1: Requires approval before generating artifact.
+variables:
+  - name: repoList
+    value: 'repo-1,repo-2,repo-3,repo-4,repo-5,repo-6,repo-7,repo-8,repo-9,repo-10'
+
+stages:
+  - stage: Validate
+    displayName: 'Validate inputs'
+    jobs:
+      - job: ValidateInputs
+        displayName: 'Check parameters'
+        pool:
+          name: 'Default'
+        steps:
+          - script: |
+              echo "Branch name: ${{ parameters.PrevReleaseBranch }}"
+              echo "Previous release branch: ${{ parameters.Components }}"
+              echo "GitHub owner: ${{ parameters.githubOwner }}"
+            displayName: 'Show parameters'
+
+  # Stage 3: Requires approval before generating artifact.
   # Create environment 'ci-build-approval' in DevOps (Pipelines > Environments) and add Approvals.
   - stage: GatherCIBuildInfo
-    displayName: 'Gather CI build info from all repos'
+    displayName: 'Gather CI build info from all prev release branch'
     dependsOn: CreateBranch
     jobs:
       - deployment: GatherBuildInfo
@@ -46,7 +64,7 @@ parameters:
             deploy:
               steps:
                 - task: PowerShell@2
-                  displayName: 'Get latest CI run and artifact version from all repos'
+                  displayName: 'Trigger deploy for repos with artifacts (Prod West)'
                   env:
                     GITHUB_TOKEN: $(GITHUB_TOKEN)
                   inputs:
@@ -54,10 +72,10 @@ parameters:
                     script: |
                             echo "Restoring project dependencies..."
                             displayName: 'Restore dependencies'
-                            
+
+
   # Deploy stages - each has its own approval. Triggers GitHub Deploy workflow only for repos with build artifacts.
   # deploy-stage-east, deploy-stage-west, deploy-prod-east, deploy-prod-west
-  stages:
   - stage: stage_east_deploy
     displayName: 'Stage East Deploy'
     dependsOn: GatherCIBuildInfo
@@ -71,9 +89,15 @@ parameters:
           runOnce:
             deploy:
               steps:
-                script: |
-                        echo "Restoring project dependencies..."
-                        displayName: 'Restore dependencies'
+                - task: PowerShell@2
+                  displayName: 'Trigger deploy for repos with artifacts (Prod West)'
+                  env:
+                    GITHUB_TOKEN: $(GITHUB_TOKEN)
+                  inputs:
+                    targetType: 'inline'
+                    script: |
+                            echo "Restoring project dependencies..."
+                            displayName: 'Restore dependencies'
 
   - stage: stage_west_deploy
     displayName: 'Stage West Deploy'
@@ -88,9 +112,15 @@ parameters:
           runOnce:
             deploy:
               steps:
-                script: |
-                        echo "Restoring project dependencies..."
-                        displayName: 'Restore dependencies'
+                - task: PowerShell@2
+                  displayName: 'Trigger deploy for repos with artifacts (Stage West)'
+                  env:
+                    GITHUB_TOKEN: $(GITHUB_TOKEN)
+                  inputs:
+                    targetType: 'inline'
+                    script: |
+                            echo "Restoring project dependencies..."
+                            displayName: 'Restore dependencies'
 
   - stage: prod_east_deploy
     displayName: 'Prod East Deploy'
@@ -107,9 +137,15 @@ parameters:
           runOnce:
             deploy:
               steps:
-                script: |
-                        echo "Restoring project dependencies..."
-                        displayName: 'Restore dependencies'
+                - task: PowerShell@2
+                  displayName: 'Trigger deploy for repos with artifacts (Prod East)'
+                  env:
+                    GITHUB_TOKEN: $(GITHUB_TOKEN)
+                  inputs:
+                    targetType: 'inline'
+                    script: |
+                            echo "Restoring project dependencies..."
+                            displayName: 'Restore dependencies'
 
   - stage: prod_west_deploy
     displayName: 'Prod West Deploy'
@@ -126,6 +162,12 @@ parameters:
           runOnce:
             deploy:
               steps:
-                script: |
-                        echo "Restoring project dependencies..."
-                        displayName: 'Restore dependencies'
+                - task: PowerShell@2
+                  displayName: 'Trigger deploy for repos with artifacts (Prod West)'
+                  env:
+                    GITHUB_TOKEN: $(GITHUB_TOKEN)
+                  inputs:
+                    targetType: 'inline'
+                    script: |
+                            echo "Restoring project dependencies..."
+                            displayName: 'Restore dependencies'
