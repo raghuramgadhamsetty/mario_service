@@ -57,6 +57,7 @@ parameters:
                             
   # Deploy stages - each has its own approval. Triggers GitHub Deploy workflow only for repos with build artifacts.
   # deploy-stage-east, deploy-stage-west, deploy-prod-east, deploy-prod-west
+  stages:
   - stage: stage_east_deploy
     displayName: 'Stage East Deploy'
     dependsOn: GatherCIBuildInfo
