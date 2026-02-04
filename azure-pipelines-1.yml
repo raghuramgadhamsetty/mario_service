@@ -8,10 +8,10 @@ trigger: none
 
 parameters:
   - name: PrevReleaseBranch
-    displayName: 'Branch name to create'
+    displayName: 'Branch name for artifacts to be pickedup'
     type: string
   - name: Components
-    displayName: 'Previous release branch (create new branch from this)'
+    displayName: 'select Components need to deployed'
     type: stringList
     values:
       - ApplicationComponent1
