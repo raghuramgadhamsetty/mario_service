@@ -244,6 +244,7 @@ stages:
 
                       $triggered = 0
                       $skipped = 0
+                      $branchEncoded = [System.Uri]::EscapeDataString($branchName)
                       foreach ($line in Get-Content $infoFile) {
                         $parts = $line -split ' - ', 2
                         if ($parts.Count -lt 2) { continue }
@@ -257,10 +258,35 @@ stages:
                         try {
                           $body = @{ ref = $branchName } | ConvertTo-Json
                           Invoke-RestMethod -Uri "$baseUrl/repos/$owner/$repo/actions/workflows/deploy.yml/dispatches" -Headers $headers -Method Post -Body $body -ContentType "application/json"
-                          Write-Host "Triggered deploy in $repo ($version) - $region" -ForegroundColor Green
+                          Write-Host "Triggered deploy in $repo ($version) - ${region}. Waiting for completion..." -ForegroundColor Green
+                          Start-Sleep -Seconds 5
+                          $runs = Invoke-RestMethod -Uri "$baseUrl/repos/$owner/$repo/actions/workflows/deploy.yml/runs?branch=$branchEncoded&per_page=5" -Headers $headers -Method Get
+                          $runId = $runs.workflow_runs[0].id
+                          $run = $null
+                          do {
+                            Start-Sleep -Seconds 10
+                            $run = Invoke-RestMethod -Uri "$baseUrl/repos/$owner/$repo/actions/runs/$runId" -Headers $headers -Method Get
+                            Write-Host "  $repo deploy status: $($run.status)" -ForegroundColor Gray
+                          } while ($run.status -ne "completed")
+                          if ($run.conclusion -ne "success") {
+                            Write-Error "Deploy failed in $repo - conclusion: $($run.conclusion)"
+                          }
+                          $logsUrl = "$baseUrl/repos/$owner/$repo/actions/runs/$runId/logs"
+                          $zipPath = "$(Pipeline.Workspace)/deploy-logs-$repo.zip"
+                          Invoke-WebRequest -Uri $logsUrl -Headers @{ Authorization = "token $($env:GITHUB_TOKEN)" } -OutFile $zipPath -UseBasicParsing
+                          $extractPath = "$(Pipeline.Workspace)/deploy-logs-$repo"
+                          Expand-Archive -Path $zipPath -DestinationPath $extractPath -Force
+                          $logFile = Get-ChildItem -Path $extractPath -Recurse -File | Where-Object { $_.Extension -eq ".txt" } | Sort-Object Length -Descending | Select-Object -First 1
+                          if ($logFile) {
+                            $lastLines = Get-Content $logFile.FullName -Tail 3
+                            Write-Host "  Last 3 lines of deploy log for $repo :" -ForegroundColor Cyan
+                            $lastLines | ForEach-Object { Write-Host "    $_" }
+                          }
+                          Remove-Item $zipPath -Force -ErrorAction SilentlyContinue
+                          Remove-Item $extractPath -Recurse -Force -ErrorAction SilentlyContinue
                           $triggered++
                         } catch {
-                          Write-Host "Failed to trigger $repo : $_" -ForegroundColor Red
+                          Write-Error "Failed for $repo : $_"
                         }
                       }
                       Write-Host "`n${region}: Triggered $triggered repos, skipped $skipped (NA)" -ForegroundColor Cyan
@@ -307,6 +333,7 @@ stages:
 
                       $triggered = 0
                       $skipped = 0
+                      $branchEncoded = [System.Uri]::EscapeDataString($branchName)
                       foreach ($line in Get-Content $infoFile) {
                         $parts = $line -split ' - ', 2
                         if ($parts.Count -lt 2) { continue }
@@ -320,10 +347,35 @@ stages:
                         try {
                           $body = @{ ref = $branchName } | ConvertTo-Json
                           Invoke-RestMethod -Uri "$baseUrl/repos/$owner/$repo/actions/workflows/deploy.yml/dispatches" -Headers $headers -Method Post -Body $body -ContentType "application/json"
-                          Write-Host "Triggered deploy in $repo ($version) - $region" -ForegroundColor Green
+                          Write-Host "Triggered deploy in $repo ($version) - ${region}. Waiting for completion..." -ForegroundColor Green
+                          Start-Sleep -Seconds 5
+                          $runs = Invoke-RestMethod -Uri "$baseUrl/repos/$owner/$repo/actions/workflows/deploy.yml/runs?branch=$branchEncoded&per_page=5" -Headers $headers -Method Get
+                          $runId = $runs.workflow_runs[0].id
+                          $run = $null
+                          do {
+                            Start-Sleep -Seconds 10
+                            $run = Invoke-RestMethod -Uri "$baseUrl/repos/$owner/$repo/actions/runs/$runId" -Headers $headers -Method Get
+                            Write-Host "  $repo deploy status: $($run.status)" -ForegroundColor Gray
+                          } while ($run.status -ne "completed")
+                          if ($run.conclusion -ne "success") {
+                            Write-Error "Deploy failed in $repo - conclusion: $($run.conclusion)"
+                          }
+                          $logsUrl = "$baseUrl/repos/$owner/$repo/actions/runs/$runId/logs"
+                          $zipPath = "$(Pipeline.Workspace)/deploy-logs-$repo.zip"
+                          Invoke-WebRequest -Uri $logsUrl -Headers @{ Authorization = "token $($env:GITHUB_TOKEN)" } -OutFile $zipPath -UseBasicParsing
+                          $extractPath = "$(Pipeline.Workspace)/deploy-logs-$repo"
+                          Expand-Archive -Path $zipPath -DestinationPath $extractPath -Force
+                          $logFile = Get-ChildItem -Path $extractPath -Recurse -File | Where-Object { $_.Extension -eq ".txt" } | Sort-Object Length -Descending | Select-Object -First 1
+                          if ($logFile) {
+                            $lastLines = Get-Content $logFile.FullName -Tail 3
+                            Write-Host "  Last 3 lines of deploy log for $repo :" -ForegroundColor Cyan
+                            $lastLines | ForEach-Object { Write-Host "    $_" }
+                          }
+                          Remove-Item $zipPath -Force -ErrorAction SilentlyContinue
+                          Remove-Item $extractPath -Recurse -Force -ErrorAction SilentlyContinue
                           $triggered++
                         } catch {
-                          Write-Host "Failed to trigger $repo : $_" -ForegroundColor Red
+                          Write-Error "Failed for $repo : $_"
                         }
                       }
                       Write-Host "`n${region}: Triggered $triggered repos, skipped $skipped (NA)" -ForegroundColor Cyan
@@ -372,6 +424,7 @@ stages:
 
                       $triggered = 0
                       $skipped = 0
+                      $branchEncoded = [System.Uri]::EscapeDataString($branchName)
                       foreach ($line in Get-Content $infoFile) {
                         $parts = $line -split ' - ', 2
                         if ($parts.Count -lt 2) { continue }
@@ -385,10 +438,35 @@ stages:
                         try {
                           $body = @{ ref = $branchName } | ConvertTo-Json
                           Invoke-RestMethod -Uri "$baseUrl/repos/$owner/$repo/actions/workflows/deploy.yml/dispatches" -Headers $headers -Method Post -Body $body -ContentType "application/json"
-                          Write-Host "Triggered deploy in $repo ($version) - $region" -ForegroundColor Green
+                          Write-Host "Triggered deploy in $repo ($version) - ${region}. Waiting for completion..." -ForegroundColor Green
+                          Start-Sleep -Seconds 5
+                          $runs = Invoke-RestMethod -Uri "$baseUrl/repos/$owner/$repo/actions/workflows/deploy.yml/runs?branch=$branchEncoded&per_page=5" -Headers $headers -Method Get
+                          $runId = $runs.workflow_runs[0].id
+                          $run = $null
+                          do {
+                            Start-Sleep -Seconds 10
+                            $run = Invoke-RestMethod -Uri "$baseUrl/repos/$owner/$repo/actions/runs/$runId" -Headers $headers -Method Get
+                            Write-Host "  $repo deploy status: $($run.status)" -ForegroundColor Gray
+                          } while ($run.status -ne "completed")
+                          if ($run.conclusion -ne "success") {
+                            Write-Error "Deploy failed in $repo - conclusion: $($run.conclusion)"
+                          }
+                          $logsUrl = "$baseUrl/repos/$owner/$repo/actions/runs/$runId/logs"
+                          $zipPath = "$(Pipeline.Workspace)/deploy-logs-$repo.zip"
+                          Invoke-WebRequest -Uri $logsUrl -Headers @{ Authorization = "token $($env:GITHUB_TOKEN)" } -OutFile $zipPath -UseBasicParsing
+                          $extractPath = "$(Pipeline.Workspace)/deploy-logs-$repo"
+                          Expand-Archive -Path $zipPath -DestinationPath $extractPath -Force
+                          $logFile = Get-ChildItem -Path $extractPath -Recurse -File | Where-Object { $_.Extension -eq ".txt" } | Sort-Object Length -Descending | Select-Object -First 1
+                          if ($logFile) {
+                            $lastLines = Get-Content $logFile.FullName -Tail 3
+                            Write-Host "  Last 3 lines of deploy log for $repo :" -ForegroundColor Cyan
+                            $lastLines | ForEach-Object { Write-Host "    $_" }
+                          }
+                          Remove-Item $zipPath -Force -ErrorAction SilentlyContinue
+                          Remove-Item $extractPath -Recurse -Force -ErrorAction SilentlyContinue
                           $triggered++
                         } catch {
-                          Write-Host "Failed to trigger $repo : $_" -ForegroundColor Red
+                          Write-Error "Failed for $repo : $_"
                         }
                       }
                       Write-Host "`n${region}: Triggered $triggered repos, skipped $skipped (NA)" -ForegroundColor Cyan
@@ -437,6 +515,7 @@ stages:
 
                       $triggered = 0
                       $skipped = 0
+                      $branchEncoded = [System.Uri]::EscapeDataString($branchName)
                       foreach ($line in Get-Content $infoFile) {
                         $parts = $line -split ' - ', 2
                         if ($parts.Count -lt 2) { continue }
@@ -450,10 +529,35 @@ stages:
                         try {
                           $body = @{ ref = $branchName } | ConvertTo-Json
                           Invoke-RestMethod -Uri "$baseUrl/repos/$owner/$repo/actions/workflows/deploy.yml/dispatches" -Headers $headers -Method Post -Body $body -ContentType "application/json"
-                          Write-Host "Triggered deploy in $repo ($version) - $region" -ForegroundColor Green
+                          Write-Host "Triggered deploy in $repo ($version) - ${region}. Waiting for completion..." -ForegroundColor Green
+                          Start-Sleep -Seconds 5
+                          $runs = Invoke-RestMethod -Uri "$baseUrl/repos/$owner/$repo/actions/workflows/deploy.yml/runs?branch=$branchEncoded&per_page=5" -Headers $headers -Method Get
+                          $runId = $runs.workflow_runs[0].id
+                          $run = $null
+                          do {
+                            Start-Sleep -Seconds 10
+                            $run = Invoke-RestMethod -Uri "$baseUrl/repos/$owner/$repo/actions/runs/$runId" -Headers $headers -Method Get
+                            Write-Host "  $repo deploy status: $($run.status)" -ForegroundColor Gray
+                          } while ($run.status -ne "completed")
+                          if ($run.conclusion -ne "success") {
+                            Write-Error "Deploy failed in $repo - conclusion: $($run.conclusion)"
+                          }
+                          $logsUrl = "$baseUrl/repos/$owner/$repo/actions/runs/$runId/logs"
+                          $zipPath = "$(Pipeline.Workspace)/deploy-logs-$repo.zip"
+                          Invoke-WebRequest -Uri $logsUrl -Headers @{ Authorization = "token $($env:GITHUB_TOKEN)" } -OutFile $zipPath -UseBasicParsing
+                          $extractPath = "$(Pipeline.Workspace)/deploy-logs-$repo"
+                          Expand-Archive -Path $zipPath -DestinationPath $extractPath -Force
+                          $logFile = Get-ChildItem -Path $extractPath -Recurse -File | Where-Object { $_.Extension -eq ".txt" } | Sort-Object Length -Descending | Select-Object -First 1
+                          if ($logFile) {
+                            $lastLines = Get-Content $logFile.FullName -Tail 3
+                            Write-Host "  Last 3 lines of deploy log for $repo :" -ForegroundColor Cyan
+                            $lastLines | ForEach-Object { Write-Host "    $_" }
+                          }
+                          Remove-Item $zipPath -Force -ErrorAction SilentlyContinue
+                          Remove-Item $extractPath -Recurse -Force -ErrorAction SilentlyContinue
                           $triggered++
                         } catch {
-                          Write-Host "Failed to trigger $repo : $_" -ForegroundColor Red
+                          Write-Error "Failed for $repo : $_"
                         }
                       }
                       Write-Host "`n${region}: Triggered $triggered repos, skipped $skipped (NA)" -ForegroundColor Cyan
