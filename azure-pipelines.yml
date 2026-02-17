@@ -17,12 +17,50 @@ parameters:
     values:
       - main
       - master
-      - NA
-      - NA
   - name: githubOwner
     displayName: 'GitHub owner/username'
     type: string
     default: 'raghuramgadhamsetty'
+  - name: repo1Enabled
+    displayName: 'Component repo-1'
+    type: boolean
+    default: true
+  - name: repo2Enabled
+    displayName: 'Component repo-2'
+    type: boolean
+    default: true
+  - name: repo3Enabled
+    displayName: 'Component repo-3'
+    type: boolean
+    default: true
+  - name: repo4Enabled
+    displayName: 'Component repo-4'
+    type: boolean
+    default: true
+  - name: repo5Enabled
+    displayName: 'Component repo-5'
+    type: boolean
+    default: true
+  - name: repo6Enabled
+    displayName: 'Component repo-6'
+    type: boolean
+    default: true
+  - name: repo7Enabled
+    displayName: 'Component repo-7'
+    type: boolean
+    default: true
+  - name: repo8Enabled
+    displayName: 'Component repo-8'
+    type: boolean
+    default: true
+  - name: repo9Enabled
+    displayName: 'Component repo-9'
+    type: boolean
+    default: true
+  - name: repo10Enabled
+    displayName: 'Component repo-10'
+    type: boolean
+    default: true
 
 variables:
   - name: repoList
@@ -41,6 +79,7 @@ stages:
               echo "Branch name: ${{ parameters.branchName }}"
               echo "Previous release branch: ${{ parameters.prevReleaseBranch }}"
               echo "GitHub owner: ${{ parameters.githubOwner }}"
+              echo "Components enabled: repo-1=${{ parameters.repo1Enabled }} repo-2=${{ parameters.repo2Enabled }} repo-3=${{ parameters.repo3Enabled }} repo-4=${{ parameters.repo4Enabled }} repo-5=${{ parameters.repo5Enabled }} repo-6=${{ parameters.repo6Enabled }} repo-7=${{ parameters.repo7Enabled }} repo-8=${{ parameters.repo8Enabled }} repo-9=${{ parameters.repo9Enabled }} repo-10=${{ parameters.repo10Enabled }}"
             displayName: 'Show parameters'
 
   - stage: CreateBranch
@@ -63,7 +102,18 @@ stages:
                 $branchName = "${{ parameters.branchName }}"
                 $prevReleaseBranch = "${{ parameters.prevReleaseBranch }}"
                 $owner = "${{ parameters.githubOwner }}"
-                $repos = @("repo-1","repo-2","repo-3","repo-4","repo-5","repo-6","repo-7","repo-8","repo-9","repo-10")
+                $repos = @()
+                if ("${{ parameters.repo1Enabled }}" -eq "True") { $repos += "repo-1" }
+                if ("${{ parameters.repo2Enabled }}" -eq "True") { $repos += "repo-2" }
+                if ("${{ parameters.repo3Enabled }}" -eq "True") { $repos += "repo-3" }
+                if ("${{ parameters.repo4Enabled }}" -eq "True") { $repos += "repo-4" }
+                if ("${{ parameters.repo5Enabled }}" -eq "True") { $repos += "repo-5" }
+                if ("${{ parameters.repo6Enabled }}" -eq "True") { $repos += "repo-6" }
+                if ("${{ parameters.repo7Enabled }}" -eq "True") { $repos += "repo-7" }
+                if ("${{ parameters.repo8Enabled }}" -eq "True") { $repos += "repo-8" }
+                if ("${{ parameters.repo9Enabled }}" -eq "True") { $repos += "repo-9" }
+                if ("${{ parameters.repo10Enabled }}" -eq "True") { $repos += "repo-10" }
+                if ($repos.Count -eq 0) { Write-Error "At least one component must be enabled." }
                 $baseUrl = "https://api.github.com"
 
                 if (-not $env:GITHUB_TOKEN) {
@@ -135,12 +185,25 @@ stages:
                       $ErrorActionPreference = "Stop"
                       $owner = "${{ parameters.githubOwner }}"
                       $branchName = "${{ parameters.branchName }}"
-                      $repos = @("repo-1","repo-2","repo-3","repo-4","repo-5","repo-6","repo-7","repo-8","repo-9","repo-10")
+                      $repos = @()
+                      if ("${{ parameters.repo1Enabled }}" -eq "True") { $repos += "repo-1" }
+                      if ("${{ parameters.repo2Enabled }}" -eq "True") { $repos += "repo-2" }
+                      if ("${{ parameters.repo3Enabled }}" -eq "True") { $repos += "repo-3" }
+                      if ("${{ parameters.repo4Enabled }}" -eq "True") { $repos += "repo-4" }
+                      if ("${{ parameters.repo5Enabled }}" -eq "True") { $repos += "repo-5" }
+                      if ("${{ parameters.repo6Enabled }}" -eq "True") { $repos += "repo-6" }
+                      if ("${{ parameters.repo7Enabled }}" -eq "True") { $repos += "repo-7" }
+                      if ("${{ parameters.repo8Enabled }}" -eq "True") { $repos += "repo-8" }
+                      if ("${{ parameters.repo9Enabled }}" -eq "True") { $repos += "repo-9" }
+                      if ("${{ parameters.repo10Enabled }}" -eq "True") { $repos += "repo-10" }
                       $baseUrl = "https://api.github.com"
                       $outputLines = @()
 
                       if (-not $env:GITHUB_TOKEN) {
                         Write-Error "GITHUB_TOKEN is not set. Add a secret pipeline variable (scope: repo + actions read)."
+                      }
+                      if ($repos.Count -eq 0) {
+                        Write-Error "No components enabled. Enable at least one component for the release."
                       }
 
                       $headers = @{
