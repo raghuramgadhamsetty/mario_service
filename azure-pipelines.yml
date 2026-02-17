@@ -101,6 +101,13 @@ parameters:
     displayName: 'repo-10 Build version (optional)'
     type: string
     default: ''
+  - name: prodActiveRegion
+    displayName: 'Prod active region'
+    type: string
+    default: 'EAST-ACTIVE-WEST-PASSIVE'
+    values:
+      - EAST-ACTIVE-WEST-PASSIVE
+      - WEST-ACTIVE-EAST-PASSIVE
 
 variables:
   - name: repoList
@@ -331,11 +338,22 @@ stages:
                     artifactName: 'ci-build-info'
                     publishLocation: 'pipeline'
 
+  - stage: Promote
+    displayName: 'Promote'
+    dependsOn: GatherCIBuildInfo
+    jobs:
+      - job: PromoteDummy
+        displayName: 'Promote (dummy)'
+        pool:
+          name: 'Default'
+        steps:
+          - script: echo "Promote stage - placeholder"
+            displayName: 'Promote'
+
   # Deploy stages - each has its own approval. Triggers GitHub Deploy workflow only for repos with build artifacts.
-  # deploy-stage-east, deploy-stage-west, deploy-prod-east, deploy-prod-west
   - stage: stage_east_deploy
     displayName: 'Stage East Deploy'
-    dependsOn: GatherCIBuildInfo
+    dependsOn: Promote
     jobs:
       - deployment: DeployStageEast
         displayName: 'Deploy to Stage East'
@@ -424,7 +442,7 @@ stages:
 
   - stage: stage_west_deploy
     displayName: 'Stage West Deploy'
-    dependsOn: GatherCIBuildInfo
+    dependsOn: Promote
     jobs:
       - deployment: DeployStageWest
         displayName: 'Deploy to Stage West'
@@ -511,15 +529,15 @@ stages:
                       }
                       Write-Host "`n${region}: Triggered $triggered repos, skipped $skipped (NA)" -ForegroundColor Cyan
 
-  - stage: prod_east_deploy
-    displayName: 'Prod East Deploy'
+  - stage: prod_deploy
+    displayName: 'Prod Deploy'
     dependsOn:
       - stage_east_deploy
       - stage_west_deploy
     jobs:
-      - deployment: DeployProdEast
-        displayName: 'Deploy to Prod East'
-        environment: 'deploy-prod-east'
+      - deployment: DeployProd
+        displayName: 'Prod Deploy (passive then active)'
+        environment: 'deploy-prod'
         pool:
           name: 'Default'
         strategy:
@@ -532,40 +550,29 @@ stages:
                     artifactName: 'ci-build-info'
                     targetPath: '$(Pipeline.Workspace)/ci-build-info'
                 - task: PowerShell@2
-                  displayName: 'Trigger deploy for repos with artifacts (Prod East)'
+                  displayName: 'Prod - Deploy to passive region first'
                   env:
                     GITHUB_TOKEN: $(GITHUB_TOKEN)
                   inputs:
                     targetType: 'inline'
                     script: |
                       $ErrorActionPreference = "Stop"
+                      $prodActiveRegion = "${{ parameters.prodActiveRegion }}"
+                      if ($prodActiveRegion -eq "EAST-ACTIVE-WEST-PASSIVE") { $region = "Prod Passive (West)" } else { $region = "Prod Passive (East)" }
                       $owner = "${{ parameters.githubOwner }}"
                       $branchName = "${{ parameters.branchName }}"
                       $baseUrl = "https://api.github.com"
                       $infoFile = "$(Pipeline.Workspace)/ci-build-info/all-repos-build-info.txt"
-                      $region = "Prod East"
-
                       if (-not $env:GITHUB_TOKEN) { Write-Error "GITHUB_TOKEN not set" }
                       if (-not (Test-Path $infoFile)) { Write-Error "Build info file not found" }
-
-                      $headers = @{
-                        "Authorization" = "token $($env:GITHUB_TOKEN)"
-                        "Accept"        = "application/vnd.github.v3+json"
-                      }
-
-                      $triggered = 0
-                      $skipped = 0
+                      $headers = @{ "Authorization" = "token $($env:GITHUB_TOKEN)"; "Accept" = "application/vnd.github.v3+json" }
+                      $triggered = 0; $skipped = 0
                       $branchEncoded = [System.Uri]::EscapeDataString($branchName)
                       foreach ($line in Get-Content $infoFile) {
                         $parts = $line -split ' - ', 2
                         if ($parts.Count -lt 2) { continue }
-                        $repo = $parts[0].Trim()
-                        $version = $parts[1].Trim()
-                        if ($version -eq "NA") {
-                          Write-Host "Skipping $repo - no artifact (NA)" -ForegroundColor Yellow
-                          $skipped++
-                          continue
-                        }
+                        $repo = $parts[0].Trim(); $version = $parts[1].Trim()
+                        if ($version -eq "NA") { Write-Host "Skipping $repo - no artifact (NA)" -ForegroundColor Yellow; $skipped++; continue }
                         try {
                           $body = @{ ref = $branchName } | ConvertTo-Json
                           Invoke-RestMethod -Uri "$baseUrl/repos/$owner/$repo/actions/workflows/deploy.yml/dispatches" -Headers $headers -Method Post -Body $body -ContentType "application/json"
@@ -573,90 +580,42 @@ stages:
                           Start-Sleep -Seconds 5
                           $runs = Invoke-RestMethod -Uri "$baseUrl/repos/$owner/$repo/actions/workflows/deploy.yml/runs?branch=$branchEncoded&per_page=5" -Headers $headers -Method Get
                           $runId = $runs.workflow_runs[0].id
-                          $run = $null
-                          do {
-                            Start-Sleep -Seconds 10
-                            $run = Invoke-RestMethod -Uri "$baseUrl/repos/$owner/$repo/actions/runs/$runId" -Headers $headers -Method Get
-                            Write-Host "  $repo deploy status: $($run.status)" -ForegroundColor Gray
-                          } while ($run.status -ne "completed")
-                          if ($run.conclusion -ne "success") {
-                            Write-Error "Deploy failed in $repo - conclusion: $($run.conclusion)"
-                          }
-                          $logsUrl = "$baseUrl/repos/$owner/$repo/actions/runs/$runId/logs"
+                          do { Start-Sleep -Seconds 10; $run = Invoke-RestMethod -Uri "$baseUrl/repos/$owner/$repo/actions/runs/$runId" -Headers $headers -Method Get; Write-Host "  $repo deploy status: $($run.status)" -ForegroundColor Gray } while ($run.status -ne "completed")
+                          if ($run.conclusion -ne "success") { Write-Error "Deploy failed in $repo - conclusion: $($run.conclusion)" }
                           $zipPath = "$(Pipeline.Workspace)/deploy-logs-$repo.zip"
-                          Invoke-WebRequest -Uri $logsUrl -Headers @{ Authorization = "token $($env:GITHUB_TOKEN)" } -OutFile $zipPath -UseBasicParsing
-                          $extractPath = "$(Pipeline.Workspace)/deploy-logs-$repo"
-                          Expand-Archive -Path $zipPath -DestinationPath $extractPath -Force
+                          Invoke-WebRequest -Uri "$baseUrl/repos/$owner/$repo/actions/runs/$runId/logs" -Headers @{ Authorization = "token $($env:GITHUB_TOKEN)" } -OutFile $zipPath -UseBasicParsing
+                          $extractPath = "$(Pipeline.Workspace)/deploy-logs-$repo"; Expand-Archive -Path $zipPath -DestinationPath $extractPath -Force
                           $logFile = Get-ChildItem -Path $extractPath -Recurse -File | Where-Object { $_.Extension -eq ".txt" } | Sort-Object Length -Descending | Select-Object -First 1
-                          if ($logFile) {
-                            $lastLines = Get-Content $logFile.FullName -Tail 3
-                            Write-Host "  Last 3 lines of deploy log for $repo :" -ForegroundColor Cyan
-                            $lastLines | ForEach-Object { Write-Host "    $_" }
-                          }
-                          Remove-Item $zipPath -Force -ErrorAction SilentlyContinue
-                          Remove-Item $extractPath -Recurse -Force -ErrorAction SilentlyContinue
+                          if ($logFile) { Get-Content $logFile.FullName -Tail 3 | ForEach-Object { Write-Host "    $_" } }
+                          Remove-Item $zipPath -Force -ErrorAction SilentlyContinue; Remove-Item $extractPath -Recurse -Force -ErrorAction SilentlyContinue
                           $triggered++
-                        } catch {
-                          Write-Error "Failed for $repo : $_"
-                        }
+                        } catch { Write-Error "Failed for $repo : $_" }
                       }
                       Write-Host "`n${region}: Triggered $triggered repos, skipped $skipped (NA)" -ForegroundColor Cyan
-
-  - stage: prod_west_deploy
-    displayName: 'Prod West Deploy'
-    dependsOn:
-      - stage_east_deploy
-      - stage_west_deploy
-    jobs:
-      - deployment: DeployProdWest
-        displayName: 'Deploy to Prod West'
-        environment: 'deploy-prod-west'
-        pool:
-          name: 'Default'
-        strategy:
-          runOnce:
-            deploy:
-              steps:
-                - task: DownloadPipelineArtifact@2
-                  displayName: 'Download ci-build-info artifact'
-                  inputs:
-                    artifactName: 'ci-build-info'
-                    targetPath: '$(Pipeline.Workspace)/ci-build-info'
                 - task: PowerShell@2
-                  displayName: 'Trigger deploy for repos with artifacts (Prod West)'
+                  displayName: 'Prod - Deploy to active region'
                   env:
                     GITHUB_TOKEN: $(GITHUB_TOKEN)
                   inputs:
                     targetType: 'inline'
                     script: |
                       $ErrorActionPreference = "Stop"
+                      $prodActiveRegion = "${{ parameters.prodActiveRegion }}"
+                      if ($prodActiveRegion -eq "EAST-ACTIVE-WEST-PASSIVE") { $region = "Prod Active (East)" } else { $region = "Prod Active (West)" }
                       $owner = "${{ parameters.githubOwner }}"
                       $branchName = "${{ parameters.branchName }}"
                       $baseUrl = "https://api.github.com"
                       $infoFile = "$(Pipeline.Workspace)/ci-build-info/all-repos-build-info.txt"
-                      $region = "Prod West"
-
                       if (-not $env:GITHUB_TOKEN) { Write-Error "GITHUB_TOKEN not set" }
                       if (-not (Test-Path $infoFile)) { Write-Error "Build info file not found" }
-
-                      $headers = @{
-                        "Authorization" = "token $($env:GITHUB_TOKEN)"
-                        "Accept"        = "application/vnd.github.v3+json"
-                      }
-
-                      $triggered = 0
-                      $skipped = 0
+                      $headers = @{ "Authorization" = "token $($env:GITHUB_TOKEN)"; "Accept" = "application/vnd.github.v3+json" }
+                      $triggered = 0; $skipped = 0
                       $branchEncoded = [System.Uri]::EscapeDataString($branchName)
                       foreach ($line in Get-Content $infoFile) {
                         $parts = $line -split ' - ', 2
                         if ($parts.Count -lt 2) { continue }
-                        $repo = $parts[0].Trim()
-                        $version = $parts[1].Trim()
-                        if ($version -eq "NA") {
-                          Write-Host "Skipping $repo - no artifact (NA)" -ForegroundColor Yellow
-                          $skipped++
-                          continue
-                        }
+                        $repo = $parts[0].Trim(); $version = $parts[1].Trim()
+                        if ($version -eq "NA") { Write-Host "Skipping $repo - no artifact (NA)" -ForegroundColor Yellow; $skipped++; continue }
                         try {
                           $body = @{ ref = $branchName } | ConvertTo-Json
                           Invoke-RestMethod -Uri "$baseUrl/repos/$owner/$repo/actions/workflows/deploy.yml/dispatches" -Headers $headers -Method Post -Body $body -ContentType "application/json"
@@ -664,31 +623,15 @@ stages:
                           Start-Sleep -Seconds 5
                           $runs = Invoke-RestMethod -Uri "$baseUrl/repos/$owner/$repo/actions/workflows/deploy.yml/runs?branch=$branchEncoded&per_page=5" -Headers $headers -Method Get
                           $runId = $runs.workflow_runs[0].id
-                          $run = $null
-                          do {
-                            Start-Sleep -Seconds 10
-                            $run = Invoke-RestMethod -Uri "$baseUrl/repos/$owner/$repo/actions/runs/$runId" -Headers $headers -Method Get
-                            Write-Host "  $repo deploy status: $($run.status)" -ForegroundColor Gray
-                          } while ($run.status -ne "completed")
-                          if ($run.conclusion -ne "success") {
-                            Write-Error "Deploy failed in $repo - conclusion: $($run.conclusion)"
-                          }
-                          $logsUrl = "$baseUrl/repos/$owner/$repo/actions/runs/$runId/logs"
+                          do { Start-Sleep -Seconds 10; $run = Invoke-RestMethod -Uri "$baseUrl/repos/$owner/$repo/actions/runs/$runId" -Headers $headers -Method Get; Write-Host "  $repo deploy status: $($run.status)" -ForegroundColor Gray } while ($run.status -ne "completed")
+                          if ($run.conclusion -ne "success") { Write-Error "Deploy failed in $repo - conclusion: $($run.conclusion)" }
                           $zipPath = "$(Pipeline.Workspace)/deploy-logs-$repo.zip"
-                          Invoke-WebRequest -Uri $logsUrl -Headers @{ Authorization = "token $($env:GITHUB_TOKEN)" } -OutFile $zipPath -UseBasicParsing
-                          $extractPath = "$(Pipeline.Workspace)/deploy-logs-$repo"
-                          Expand-Archive -Path $zipPath -DestinationPath $extractPath -Force
+                          Invoke-WebRequest -Uri "$baseUrl/repos/$owner/$repo/actions/runs/$runId/logs" -Headers @{ Authorization = "token $($env:GITHUB_TOKEN)" } -OutFile $zipPath -UseBasicParsing
+                          $extractPath = "$(Pipeline.Workspace)/deploy-logs-$repo"; Expand-Archive -Path $zipPath -DestinationPath $extractPath -Force
                           $logFile = Get-ChildItem -Path $extractPath -Recurse -File | Where-Object { $_.Extension -eq ".txt" } | Sort-Object Length -Descending | Select-Object -First 1
-                          if ($logFile) {
-                            $lastLines = Get-Content $logFile.FullName -Tail 3
-                            Write-Host "  Last 3 lines of deploy log for $repo :" -ForegroundColor Cyan
-                            $lastLines | ForEach-Object { Write-Host "    $_" }
-                          }
-                          Remove-Item $zipPath -Force -ErrorAction SilentlyContinue
-                          Remove-Item $extractPath -Recurse -Force -ErrorAction SilentlyContinue
+                          if ($logFile) { Get-Content $logFile.FullName -Tail 3 | ForEach-Object { Write-Host "    $_" } }
+                          Remove-Item $zipPath -Force -ErrorAction SilentlyContinue; Remove-Item $extractPath -Recurse -Force -ErrorAction SilentlyContinue
                           $triggered++
-                        } catch {
-                          Write-Error "Failed for $repo : $_"
-                        }
+                        } catch { Write-Error "Failed for $repo : $_" }
                       }
                       Write-Host "`n${region}: Triggered $triggered repos, skipped $skipped (NA)" -ForegroundColor Cyan
