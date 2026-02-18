@@ -422,8 +422,12 @@ stages:
                     targetPath: '$(Pipeline.Workspace)/ci-build-info'
                 - template: deploy-components.yml
                   parameters:
-                    region: 'Prod Passive (West)'
-                    region2: 'Prod Active (East)'
+                    region: 'Prod West'
+                    owner: ${{ parameters.githubOwner }}
+                    branchName: ${{ parameters.branchName }}
+                - template: deploy-components.yml
+                  parameters:
+                    region: 'Prod East'
                     owner: ${{ parameters.githubOwner }}
                     branchName: ${{ parameters.branchName }}
       - deployment: DeployProdWestActive
@@ -443,7 +447,11 @@ stages:
                     targetPath: '$(Pipeline.Workspace)/ci-build-info'
                 - template: deploy-components.yml
                   parameters:
-                    region: 'Prod Passive (East)'
-                    region2: 'Prod Active (West)'
+                    region: 'Prod East'
+                    owner: ${{ parameters.githubOwner }}
+                    branchName: ${{ parameters.branchName }}
+                - template: deploy-components.yml
+                  parameters:
+                    region: 'Prod West'
                     owner: ${{ parameters.githubOwner }}
                     branchName: ${{ parameters.branchName }}
