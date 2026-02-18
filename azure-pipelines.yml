@@ -21,7 +21,6 @@ parameters:
   - name: githubOwner
     displayName: 'GitHub owner/username'
     type: string
-    default: 'raghuramgadhamsetty'
   - name: prodActiveRegion
     displayName: 'Prod active region'
     type: string
@@ -284,7 +283,9 @@ stages:
   # Deploy stages - each has its own approval. Triggers GitHub Deploy workflow only for repos with build artifacts.
   - stage: stage_east_deploy
     displayName: 'Stage East Deploy'
-    dependsOn: Promote
+    dependsOn:
+      - Promote
+      - GatherCIBuildInfo
     jobs:
       - deployment: DeployStageEast
         displayName: 'Deploy to Stage East'
@@ -298,7 +299,7 @@ stages:
                 - task: DownloadPipelineArtifact@2
                   displayName: 'Download ci-build-info artifact'
                   inputs:
-                    artifactName: $[ dependencies.GatherBuildInfo.outputs['SetArtifactName.ArtifactName'] ]
+                    artifactName: $[ dependencies.GatherCIBuildInfo.GatherBuildInfo.outputs['SetArtifactName.ArtifactName'] ]
                     targetPath: '$(Pipeline.Workspace)/ci-build-info'
                 - template: deploy-components.yml
                   parameters:
@@ -308,7 +309,9 @@ stages:
 
   - stage: stage_west_deploy
     displayName: 'Stage West Deploy'
-    dependsOn: Promote
+    dependsOn:
+      - Promote
+      - GatherCIBuildInfo
     jobs:
       - deployment: DeployStageWest
         displayName: 'Deploy to Stage West'
@@ -322,7 +325,7 @@ stages:
                 - task: DownloadPipelineArtifact@2
                   displayName: 'Download ci-build-info artifact'
                   inputs:
-                    artifactName: $[ dependencies.GatherBuildInfo.outputs['SetArtifactName.ArtifactName'] ]
+                    artifactName: $[ dependencies.GatherCIBuildInfo.GatherBuildInfo.outputs['SetArtifactName.ArtifactName'] ]
                     targetPath: '$(Pipeline.Workspace)/ci-build-info'
                 - template: deploy-components.yml
                   parameters:
@@ -335,6 +338,7 @@ stages:
     dependsOn:
       - stage_east_deploy
       - stage_west_deploy
+      - GatherCIBuildInfo
     jobs:
       - deployment: DeployProdEastActive
         displayName: 'Prod Deploy (East active, West passive)'
@@ -349,7 +353,7 @@ stages:
                 - task: DownloadPipelineArtifact@2
                   displayName: 'Download ci-build-info artifact'
                   inputs:
-                    artifactName: $[ dependencies.GatherBuildInfo.outputs['SetArtifactName.ArtifactName'] ]
+                    artifactName: $[ dependencies.GatherCIBuildInfo.GatherBuildInfo.outputs['SetArtifactName.ArtifactName'] ]
                     targetPath: '$(Pipeline.Workspace)/ci-build-info'
                 - template: deploy-components.yml
                   parameters:
@@ -376,7 +380,7 @@ stages:
                 - task: DownloadPipelineArtifact@2
                   displayName: 'Download ci-build-info artifact'
                   inputs:
-                    artifactName: $[ dependencies.GatherBuildInfo.outputs['SetArtifactName.ArtifactName'] ]
+                    artifactName: $[ dependencies.GatherCIBuildInfo.GatherBuildInfo.outputs['SetArtifactName.ArtifactName'] ]
                     targetPath: '$(Pipeline.Workspace)/ci-build-info'
                 - template: deploy-components.yml
                   parameters:
