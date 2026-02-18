@@ -425,11 +425,13 @@ stages:
                     region: 'Prod Passive (West)'
                     owner: ${{ parameters.githubOwner }}
                     branchName: ${{ parameters.branchName }}
+                    parseStepName: 'ParseArtifactPassive'
                 - template: deploy-components.yml
                   parameters:
                     region: 'Prod Active (East)'
                     owner: ${{ parameters.githubOwner }}
                     branchName: ${{ parameters.branchName }}
+                    parseStepName: 'ParseArtifactActive'
       - deployment: DeployProdWestActive
         displayName: 'Prod Deploy (West active, East passive)'
         condition: eq('${{ parameters.prodActiveRegion }}', 'WEST-ACTIVE-EAST-PASSIVE')
@@ -450,8 +452,10 @@ stages:
                     region: 'Prod Passive (East)'
                     owner: ${{ parameters.githubOwner }}
                     branchName: ${{ parameters.branchName }}
+                    parseStepName: 'ParseArtifactPassive'
                 - template: deploy-components.yml
                   parameters:
                     region: 'Prod Active (West)'
                     owner: ${{ parameters.githubOwner }}
                     branchName: ${{ parameters.branchName }}
+                    parseStepName: 'ParseArtifactActive'
