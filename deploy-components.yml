@@ -46,7 +46,7 @@ steps:
       targetType: 'inline'
       script: |
         $ErrorActionPreference = "Stop"
-        $repo = "repo-1"; $version = ""; $workflowFile = "deploy.yaml"
+        $repo = "repo-1"; $version = ""; $workflowFile = "deploy.yml"
         $owner = "${{ parameters.owner }}"; $branchName = "${{ parameters.branchName }}"; $region = "${{ parameters.region }}"
         $baseUrl = "https://api.github.com"; $infoFile = "$(Pipeline.Workspace)/ci-build-info/all-repos-build-info.txt"
         foreach ($line in Get-Content $infoFile) { $p = $line -split ' - ', 2; if ($p[0].Trim() -eq $repo -and $p.Count -ge 2) { $version = $p[1].Trim(); break } }
@@ -75,7 +75,7 @@ steps:
       targetType: 'inline'
       script: |
         $ErrorActionPreference = "Stop"
-        $repo = "repo-2"; $version = ""; $workflowFile = "deploy.yaml"
+        $repo = "repo-2"; $version = ""; $workflowFile = "deploy.yml"
         $owner = "${{ parameters.owner }}"; $branchName = "${{ parameters.branchName }}"; $region = "${{ parameters.region }}"
         $baseUrl = "https://api.github.com"; $infoFile = "$(Pipeline.Workspace)/ci-build-info/all-repos-build-info.txt"
         foreach ($line in Get-Content $infoFile) { $p = $line -split ' - ', 2; if ($p[0].Trim() -eq $repo -and $p.Count -ge 2) { $version = $p[1].Trim(); break } }
@@ -104,7 +104,7 @@ steps:
       targetType: 'inline'
       script: |
         $ErrorActionPreference = "Stop"
-        $repo = "repo-3"; $version = ""; $workflowFile = "deploy.yaml"
+        $repo = "repo-3"; $version = ""; $workflowFile = "deploy.yml"
         $owner = "${{ parameters.owner }}"; $branchName = "${{ parameters.branchName }}"; $region = "${{ parameters.region }}"
         $baseUrl = "https://api.github.com"; $infoFile = "$(Pipeline.Workspace)/ci-build-info/all-repos-build-info.txt"
         foreach ($line in Get-Content $infoFile) { $p = $line -split ' - ', 2; if ($p[0].Trim() -eq $repo -and $p.Count -ge 2) { $version = $p[1].Trim(); break } }
@@ -133,7 +133,7 @@ steps:
       targetType: 'inline'
       script: |
         $ErrorActionPreference = "Stop"
-        $repo = "repo-4"; $version = ""; $workflowFile = "deploy.yaml"
+        $repo = "repo-4"; $version = ""; $workflowFile = "deploy.yml"
         $owner = "${{ parameters.owner }}"; $branchName = "${{ parameters.branchName }}"; $region = "${{ parameters.region }}"
         $baseUrl = "https://api.github.com"; $infoFile = "$(Pipeline.Workspace)/ci-build-info/all-repos-build-info.txt"
         foreach ($line in Get-Content $infoFile) { $p = $line -split ' - ', 2; if ($p[0].Trim() -eq $repo -and $p.Count -ge 2) { $version = $p[1].Trim(); break } }
@@ -162,7 +162,7 @@ steps:
       targetType: 'inline'
       script: |
         $ErrorActionPreference = "Stop"
-        $repo = "repo-5"; $version = ""; $workflowFile = "deploy.yaml"
+        $repo = "repo-5"; $version = ""; $workflowFile = "deploy.yml"
         $owner = "${{ parameters.owner }}"; $branchName = "${{ parameters.branchName }}"; $region = "${{ parameters.region }}"
         $baseUrl = "https://api.github.com"; $infoFile = "$(Pipeline.Workspace)/ci-build-info/all-repos-build-info.txt"
         foreach ($line in Get-Content $infoFile) { $p = $line -split ' - ', 2; if ($p[0].Trim() -eq $repo -and $p.Count -ge 2) { $version = $p[1].Trim(); break } }
@@ -191,7 +191,7 @@ steps:
       targetType: 'inline'
       script: |
         $ErrorActionPreference = "Stop"
-        $repo = "repo-6"; $version = ""; $workflowFile = "deploy.yaml"
+        $repo = "repo-6"; $version = ""; $workflowFile = "deploy.yml"
         $owner = "${{ parameters.owner }}"; $branchName = "${{ parameters.branchName }}"; $region = "${{ parameters.region }}"
         $baseUrl = "https://api.github.com"; $infoFile = "$(Pipeline.Workspace)/ci-build-info/all-repos-build-info.txt"
         foreach ($line in Get-Content $infoFile) { $p = $line -split ' - ', 2; if ($p[0].Trim() -eq $repo -and $p.Count -ge 2) { $version = $p[1].Trim(); break } }
@@ -220,7 +220,7 @@ steps:
       targetType: 'inline'
       script: |
         $ErrorActionPreference = "Stop"
-        $repo = "repo-7"; $version = ""; $workflowFile = "deploy.yaml"
+        $repo = "repo-7"; $version = ""; $workflowFile = "deploy.yml"
         $owner = "${{ parameters.owner }}"; $branchName = "${{ parameters.branchName }}"; $region = "${{ parameters.region }}"
         $baseUrl = "https://api.github.com"; $infoFile = "$(Pipeline.Workspace)/ci-build-info/all-repos-build-info.txt"
         foreach ($line in Get-Content $infoFile) { $p = $line -split ' - ', 2; if ($p[0].Trim() -eq $repo -and $p.Count -ge 2) { $version = $p[1].Trim(); break } }
@@ -249,7 +249,7 @@ steps:
       targetType: 'inline'
       script: |
         $ErrorActionPreference = "Stop"
-        $repo = "repo-8"; $version = ""; $workflowFile = "deploy.yaml"
+        $repo = "repo-8"; $version = ""; $workflowFile = "deploy.yml"
         $owner = "${{ parameters.owner }}"; $branchName = "${{ parameters.branchName }}"; $region = "${{ parameters.region }}"
         $baseUrl = "https://api.github.com"; $infoFile = "$(Pipeline.Workspace)/ci-build-info/all-repos-build-info.txt"
         foreach ($line in Get-Content $infoFile) { $p = $line -split ' - ', 2; if ($p[0].Trim() -eq $repo -and $p.Count -ge 2) { $version = $p[1].Trim(); break } }
@@ -278,7 +278,7 @@ steps:
       targetType: 'inline'
       script: |
         $ErrorActionPreference = "Stop"
-        $repo = "repo-9"; $version = ""; $workflowFile = "deploy.yaml"
+        $repo = "repo-9"; $version = ""; $workflowFile = "deploy.yml"
         $owner = "${{ parameters.owner }}"; $branchName = "${{ parameters.branchName }}"; $region = "${{ parameters.region }}"
         $baseUrl = "https://api.github.com"; $infoFile = "$(Pipeline.Workspace)/ci-build-info/all-repos-build-info.txt"
         foreach ($line in Get-Content $infoFile) { $p = $line -split ' - ', 2; if ($p[0].Trim() -eq $repo -and $p.Count -ge 2) { $version = $p[1].Trim(); break } }
@@ -307,7 +307,7 @@ steps:
       targetType: 'inline'
       script: |
         $ErrorActionPreference = "Stop"
-        $repo = "repo-10"; $version = ""; $workflowFile = "deploy.yaml"
+        $repo = "repo-10"; $version = ""; $workflowFile = "deploy.yml"
         $owner = "${{ parameters.owner }}"; $branchName = "${{ parameters.branchName }}"; $region = "${{ parameters.region }}"
         $baseUrl = "https://api.github.com"; $infoFile = "$(Pipeline.Workspace)/ci-build-info/all-repos-build-info.txt"
         foreach ($line in Get-Content $infoFile) { $p = $line -split ' - ', 2; if ($p[0].Trim() -eq $repo -and $p.Count -ge 2) { $version = $p[1].Trim(); break } }
