@@ -1,5 +1,6 @@
-# Reusable deploy steps: parse artifact then run one task per component (skip if not in artifact).
-# Call once per region (Stage East, Stage West, or Prod West / Prod East). For Prod, call twice: passive then active.
+# Reusable deploy steps: optionally parse artifact, then run one task per component (skip if not in artifact).
+# Use includeParse: true on first call per job (or single call); use includeParse: false on second call (Prod East after Prod West).
+# All deploy conditions use ParseArtifact.repoN_in_artifact so one parse per job is enough.
 parameters:
   - name: region
     type: string
@@ -7,41 +8,45 @@ parameters:
     type: string
   - name: branchName
     type: string
+  - name: includeParse
+    type: boolean
+    default: true
 
 steps:
-  - task: PowerShell@2
-    name: ${{ replace(replace(replace(parameters.region, ' ', '_'), '(', ''), ')', '') }}
-    displayName: 'Parse artifact – which components to deploy'
-    inputs:
-      targetType: 'inline'
-      script: |
-        $infoFile = "$(Pipeline.Workspace)/ci-build-info/all-repos-build-info.txt"
-        $inArtifact = @{}
-        if (Test-Path $infoFile) {
-          foreach ($line in Get-Content $infoFile) {
-            $parts = $line -split ' - ', 2
-            if ($parts.Count -ge 2) {
-              $repo = $parts[0].Trim()
-              $version = $parts[1].Trim()
-              $inArtifact[$repo] = ($version -ne "NA")
+  - ${{ if eq(parameters.includeParse, true) }}:
+    - task: PowerShell@2
+      name: ParseArtifact
+      displayName: 'Parse artifact – which components to deploy'
+      inputs:
+        targetType: 'inline'
+        script: |
+          $infoFile = "$(Pipeline.Workspace)/ci-build-info/all-repos-build-info.txt"
+          $inArtifact = @{}
+          if (Test-Path $infoFile) {
+            foreach ($line in Get-Content $infoFile) {
+              $parts = $line -split ' - ', 2
+              if ($parts.Count -ge 2) {
+                $repo = $parts[0].Trim()
+                $version = $parts[1].Trim()
+                $inArtifact[$repo] = ($version -ne "NA")
+              }
             }
           }
-        }
-        foreach ($i in 1..10) {
-          $repo = "repo-$i"
-          $val = if ($inArtifact[$repo]) { "true" } else { "false" }
-          Write-Host "##vso[task.setvariable variable=repo${i}_in_artifact;isOutput=true]$val"
-        }
+          foreach ($i in 1..10) {
+            $repo = "repo-$i"
+            $val = if ($inArtifact[$repo]) { "true" } else { "false" }
+            Write-Host "##vso[task.setvariable variable=repo${i}_in_artifact;isOutput=true]$val"
+          }
   - task: PowerShell@2
-    displayName: 'Deploy component repo-1'
-    condition: eq(variables['${{ replace(replace(replace(parameters.region, ' ', '_'), '(', ''), ')', '') }}.repo1_in_artifact'], 'true')
+    displayName: 'Deploy component repo-1 in ${{ parameters.region }}'
+    condition: eq(variables['ParseArtifact.repo1_in_artifact'], 'true')
     env:
       GITHUB_TOKEN: $(GITHUB_TOKEN)
     inputs:
       targetType: 'inline'
       script: |
         $ErrorActionPreference = "Stop"
-        $repo = "repo-1"; $version = ""; $workflowFile = "deploy.yml"
+        $repo = "repo-1"; $version = ""; $workflowFile = "deploy.yaml"
         $owner = "${{ parameters.owner }}"; $branchName = "${{ parameters.branchName }}"; $region = "${{ parameters.region }}"
         $baseUrl = "https://api.github.com"; $infoFile = "$(Pipeline.Workspace)/ci-build-info/all-repos-build-info.txt"
         foreach ($line in Get-Content $infoFile) { $p = $line -split ' - ', 2; if ($p[0].Trim() -eq $repo -and $p.Count -ge 2) { $version = $p[1].Trim(); break } }
@@ -62,15 +67,15 @@ steps:
         if ($logFile) { Get-Content $logFile.FullName -Tail 3 | ForEach-Object { Write-Host "    $_" } }
         Remove-Item $zipPath -Force -ErrorAction SilentlyContinue; Remove-Item $extractPath -Recurse -Force -ErrorAction SilentlyContinue
   - task: PowerShell@2
-    displayName: 'Deploy component repo-2'
-    condition: eq(variables['${{ replace(replace(replace(parameters.region, ' ', '_'), '(', ''), ')', '') }}.repo2_in_artifact'], 'true')
+    displayName: 'Deploy component repo-2 in ${{ parameters.region }}'
+    condition: eq(variables['ParseArtifact.repo2_in_artifact'], 'true')
     env:
       GITHUB_TOKEN: $(GITHUB_TOKEN)
     inputs:
       targetType: 'inline'
       script: |
         $ErrorActionPreference = "Stop"
-        $repo = "repo-2"; $version = ""; $workflowFile = "deploy.yml"
+        $repo = "repo-2"; $version = ""; $workflowFile = "deploy.yaml"
         $owner = "${{ parameters.owner }}"; $branchName = "${{ parameters.branchName }}"; $region = "${{ parameters.region }}"
         $baseUrl = "https://api.github.com"; $infoFile = "$(Pipeline.Workspace)/ci-build-info/all-repos-build-info.txt"
         foreach ($line in Get-Content $infoFile) { $p = $line -split ' - ', 2; if ($p[0].Trim() -eq $repo -and $p.Count -ge 2) { $version = $p[1].Trim(); break } }
@@ -91,15 +96,15 @@ steps:
         if ($logFile) { Get-Content $logFile.FullName -Tail 3 | ForEach-Object { Write-Host "    $_" } }
         Remove-Item $zipPath -Force -ErrorAction SilentlyContinue; Remove-Item $extractPath -Recurse -Force -ErrorAction SilentlyContinue
   - task: PowerShell@2
-    displayName: 'Deploy component repo-3'
-    condition: eq(variables['${{ replace(replace(replace(parameters.region, ' ', '_'), '(', ''), ')', '') }}.repo3_in_artifact'], 'true')
+    displayName: 'Deploy component repo-3 in ${{ parameters.region }}'
+    condition: eq(variables['ParseArtifact.repo3_in_artifact'], 'true')
     env:
       GITHUB_TOKEN: $(GITHUB_TOKEN)
     inputs:
       targetType: 'inline'
       script: |
         $ErrorActionPreference = "Stop"
-        $repo = "repo-3"; $version = ""; $workflowFile = "deploy.yml"
+        $repo = "repo-3"; $version = ""; $workflowFile = "deploy.yaml"
         $owner = "${{ parameters.owner }}"; $branchName = "${{ parameters.branchName }}"; $region = "${{ parameters.region }}"
         $baseUrl = "https://api.github.com"; $infoFile = "$(Pipeline.Workspace)/ci-build-info/all-repos-build-info.txt"
         foreach ($line in Get-Content $infoFile) { $p = $line -split ' - ', 2; if ($p[0].Trim() -eq $repo -and $p.Count -ge 2) { $version = $p[1].Trim(); break } }
@@ -120,15 +125,15 @@ steps:
         if ($logFile) { Get-Content $logFile.FullName -Tail 3 | ForEach-Object { Write-Host "    $_" } }
         Remove-Item $zipPath -Force -ErrorAction SilentlyContinue; Remove-Item $extractPath -Recurse -Force -ErrorAction SilentlyContinue
   - task: PowerShell@2
-    displayName: 'Deploy component repo-4'
-    condition: eq(variables['${{ replace(replace(replace(parameters.region, ' ', '_'), '(', ''), ')', '') }}.repo4_in_artifact'], 'true')
+    displayName: 'Deploy component repo-4 in ${{ parameters.region }}'
+    condition: eq(variables['ParseArtifact.repo4_in_artifact'], 'true')
     env:
       GITHUB_TOKEN: $(GITHUB_TOKEN)
     inputs:
       targetType: 'inline'
       script: |
         $ErrorActionPreference = "Stop"
-        $repo = "repo-4"; $version = ""; $workflowFile = "deploy.yml"
+        $repo = "repo-4"; $version = ""; $workflowFile = "deploy.yaml"
         $owner = "${{ parameters.owner }}"; $branchName = "${{ parameters.branchName }}"; $region = "${{ parameters.region }}"
         $baseUrl = "https://api.github.com"; $infoFile = "$(Pipeline.Workspace)/ci-build-info/all-repos-build-info.txt"
         foreach ($line in Get-Content $infoFile) { $p = $line -split ' - ', 2; if ($p[0].Trim() -eq $repo -and $p.Count -ge 2) { $version = $p[1].Trim(); break } }
@@ -149,15 +154,15 @@ steps:
         if ($logFile) { Get-Content $logFile.FullName -Tail 3 | ForEach-Object { Write-Host "    $_" } }
         Remove-Item $zipPath -Force -ErrorAction SilentlyContinue; Remove-Item $extractPath -Recurse -Force -ErrorAction SilentlyContinue
   - task: PowerShell@2
-    displayName: 'Deploy component repo-5'
-    condition: eq(variables['${{ replace(replace(replace(parameters.region, ' ', '_'), '(', ''), ')', '') }}.repo5_in_artifact'], 'true')
+    displayName: 'Deploy component repo-5 in ${{ parameters.region }}'
+    condition: eq(variables['ParseArtifact.repo5_in_artifact'], 'true')
     env:
       GITHUB_TOKEN: $(GITHUB_TOKEN)
     inputs:
       targetType: 'inline'
       script: |
         $ErrorActionPreference = "Stop"
-        $repo = "repo-5"; $version = ""; $workflowFile = "deploy.yml"
+        $repo = "repo-5"; $version = ""; $workflowFile = "deploy.yaml"
         $owner = "${{ parameters.owner }}"; $branchName = "${{ parameters.branchName }}"; $region = "${{ parameters.region }}"
         $baseUrl = "https://api.github.com"; $infoFile = "$(Pipeline.Workspace)/ci-build-info/all-repos-build-info.txt"
         foreach ($line in Get-Content $infoFile) { $p = $line -split ' - ', 2; if ($p[0].Trim() -eq $repo -and $p.Count -ge 2) { $version = $p[1].Trim(); break } }
@@ -178,15 +183,15 @@ steps:
         if ($logFile) { Get-Content $logFile.FullName -Tail 3 | ForEach-Object { Write-Host "    $_" } }
         Remove-Item $zipPath -Force -ErrorAction SilentlyContinue; Remove-Item $extractPath -Recurse -Force -ErrorAction SilentlyContinue
   - task: PowerShell@2
-    displayName: 'Deploy component repo-6'
-    condition: eq(variables['${{ replace(replace(replace(parameters.region, ' ', '_'), '(', ''), ')', '') }}.repo6_in_artifact'], 'true')
+    displayName: 'Deploy component repo-6 in ${{ parameters.region }}'
+    condition: eq(variables['ParseArtifact.repo6_in_artifact'], 'true')
     env:
       GITHUB_TOKEN: $(GITHUB_TOKEN)
     inputs:
       targetType: 'inline'
       script: |
         $ErrorActionPreference = "Stop"
-        $repo = "repo-6"; $version = ""; $workflowFile = "deploy.yml"
+        $repo = "repo-6"; $version = ""; $workflowFile = "deploy.yaml"
         $owner = "${{ parameters.owner }}"; $branchName = "${{ parameters.branchName }}"; $region = "${{ parameters.region }}"
         $baseUrl = "https://api.github.com"; $infoFile = "$(Pipeline.Workspace)/ci-build-info/all-repos-build-info.txt"
         foreach ($line in Get-Content $infoFile) { $p = $line -split ' - ', 2; if ($p[0].Trim() -eq $repo -and $p.Count -ge 2) { $version = $p[1].Trim(); break } }
@@ -207,15 +212,15 @@ steps:
         if ($logFile) { Get-Content $logFile.FullName -Tail 3 | ForEach-Object { Write-Host "    $_" } }
         Remove-Item $zipPath -Force -ErrorAction SilentlyContinue; Remove-Item $extractPath -Recurse -Force -ErrorAction SilentlyContinue
   - task: PowerShell@2
-    displayName: 'Deploy component repo-7'
-    condition: eq(variables['${{ replace(replace(replace(parameters.region, ' ', '_'), '(', ''), ')', '') }}.repo7_in_artifact'], 'true')
+    displayName: 'Deploy component repo-7 in ${{ parameters.region }}'
+    condition: eq(variables['ParseArtifact.repo7_in_artifact'], 'true')
     env:
       GITHUB_TOKEN: $(GITHUB_TOKEN)
     inputs:
       targetType: 'inline'
       script: |
         $ErrorActionPreference = "Stop"
-        $repo = "repo-7"; $version = ""; $workflowFile = "deploy.yml"
+        $repo = "repo-7"; $version = ""; $workflowFile = "deploy.yaml"
         $owner = "${{ parameters.owner }}"; $branchName = "${{ parameters.branchName }}"; $region = "${{ parameters.region }}"
         $baseUrl = "https://api.github.com"; $infoFile = "$(Pipeline.Workspace)/ci-build-info/all-repos-build-info.txt"
         foreach ($line in Get-Content $infoFile) { $p = $line -split ' - ', 2; if ($p[0].Trim() -eq $repo -and $p.Count -ge 2) { $version = $p[1].Trim(); break } }
@@ -236,15 +241,15 @@ steps:
         if ($logFile) { Get-Content $logFile.FullName -Tail 3 | ForEach-Object { Write-Host "    $_" } }
         Remove-Item $zipPath -Force -ErrorAction SilentlyContinue; Remove-Item $extractPath -Recurse -Force -ErrorAction SilentlyContinue
   - task: PowerShell@2
-    displayName: 'Deploy component repo-8'
-    condition: eq(variables['${{ replace(replace(replace(parameters.region, ' ', '_'), '(', ''), ')', '') }}.repo8_in_artifact'], 'true')
+    displayName: 'Deploy component repo-8 in ${{ parameters.region }}'
+    condition: eq(variables['ParseArtifact.repo8_in_artifact'], 'true')
     env:
       GITHUB_TOKEN: $(GITHUB_TOKEN)
     inputs:
       targetType: 'inline'
       script: |
         $ErrorActionPreference = "Stop"
-        $repo = "repo-8"; $version = ""; $workflowFile = "deploy.yml"
+        $repo = "repo-8"; $version = ""; $workflowFile = "deploy.yaml"
         $owner = "${{ parameters.owner }}"; $branchName = "${{ parameters.branchName }}"; $region = "${{ parameters.region }}"
         $baseUrl = "https://api.github.com"; $infoFile = "$(Pipeline.Workspace)/ci-build-info/all-repos-build-info.txt"
         foreach ($line in Get-Content $infoFile) { $p = $line -split ' - ', 2; if ($p[0].Trim() -eq $repo -and $p.Count -ge 2) { $version = $p[1].Trim(); break } }
@@ -265,15 +270,15 @@ steps:
         if ($logFile) { Get-Content $logFile.FullName -Tail 3 | ForEach-Object { Write-Host "    $_" } }
         Remove-Item $zipPath -Force -ErrorAction SilentlyContinue; Remove-Item $extractPath -Recurse -Force -ErrorAction SilentlyContinue
   - task: PowerShell@2
-    displayName: 'Deploy component repo-9'
-    condition: eq(variables['${{ replace(replace(replace(parameters.region, ' ', '_'), '(', ''), ')', '') }}.repo9_in_artifact'], 'true')
+    displayName: 'Deploy component repo-9 in ${{ parameters.region }}'
+    condition: eq(variables['ParseArtifact.repo9_in_artifact'], 'true')
     env:
       GITHUB_TOKEN: $(GITHUB_TOKEN)
     inputs:
       targetType: 'inline'
       script: |
         $ErrorActionPreference = "Stop"
-        $repo = "repo-9"; $version = ""; $workflowFile = "deploy.yml"
+        $repo = "repo-9"; $version = ""; $workflowFile = "deploy.yaml"
         $owner = "${{ parameters.owner }}"; $branchName = "${{ parameters.branchName }}"; $region = "${{ parameters.region }}"
         $baseUrl = "https://api.github.com"; $infoFile = "$(Pipeline.Workspace)/ci-build-info/all-repos-build-info.txt"
         foreach ($line in Get-Content $infoFile) { $p = $line -split ' - ', 2; if ($p[0].Trim() -eq $repo -and $p.Count -ge 2) { $version = $p[1].Trim(); break } }
@@ -294,15 +299,15 @@ steps:
         if ($logFile) { Get-Content $logFile.FullName -Tail 3 | ForEach-Object { Write-Host "    $_" } }
         Remove-Item $zipPath -Force -ErrorAction SilentlyContinue; Remove-Item $extractPath -Recurse -Force -ErrorAction SilentlyContinue
   - task: PowerShell@2
-    displayName: 'Deploy component repo-10'
-    condition: eq(variables['${{ replace(replace(replace(parameters.region, ' ', '_'), '(', ''), ')', '') }}.repo10_in_artifact'], 'true')
+    displayName: 'Deploy component repo-10 in ${{ parameters.region }}'
+    condition: eq(variables['ParseArtifact.repo10_in_artifact'], 'true')
     env:
       GITHUB_TOKEN: $(GITHUB_TOKEN)
     inputs:
       targetType: 'inline'
       script: |
         $ErrorActionPreference = "Stop"
-        $repo = "repo-10"; $version = ""; $workflowFile = "deploy.yml"
+        $repo = "repo-10"; $version = ""; $workflowFile = "deploy.yaml"
         $owner = "${{ parameters.owner }}"; $branchName = "${{ parameters.branchName }}"; $region = "${{ parameters.region }}"
         $baseUrl = "https://api.github.com"; $infoFile = "$(Pipeline.Workspace)/ci-build-info/all-repos-build-info.txt"
         foreach ($line in Get-Content $infoFile) { $p = $line -split ' - ', 2; if ($p[0].Trim() -eq $repo -and $p.Count -ge 2) { $version = $p[1].Trim(); break } }
