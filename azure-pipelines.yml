@@ -1,5 +1,5 @@
-# Pipeline: Create a branch in all 10 GitHub repos (repo-1 through repo-10)
-# Pipeline inputs: variable group name, branchName, prevReleaseBranch, githubOwner, prodActiveRegion. Repo enabled/build version come from the variable group.
+# Pipeline: Create a branch in all 10 GitHub repos (mario_service, contra_app, ...)
+# Run this pipeline and provide the branch name when prompted.
 
 name: ReleasePipeline-$(Build.BuildId)-$(Date:yyyyMMddHHmmss)
 appendCommitMessageToRunName: false
@@ -7,9 +7,6 @@ appendCommitMessageToRunName: false
 trigger: none
 
 parameters:
-  - name: variableGroupName
-    displayName: 'Variable group name'
-    type: string
   - name: branchName
     displayName: 'Branch name to create'
     type: string
@@ -20,32 +17,101 @@ parameters:
     values:
       - main
       - master
-      - BR_01_18
-      - BR_01_27
   - name: githubOwner
     displayName: 'GitHub owner/username'
     type: string
     default: 'raghuramgadhamsetty'
+  - name: mario_service_deploy_enabled
+    displayName: 'Component mario_service'
+    type: boolean
+    default: true
+  - name: mario_service_BuildVersion_override
+    displayName: 'mario_service Build version (optional)'
+    type: string
+    default: ' '
+  - name: contra_app_deploy_enabled
+    displayName: 'Component contra_app'
+    type: boolean
+    default: true
+  - name: contra_app_BuildVersion_override
+    displayName: 'contra_app Build version (optional)'
+    type: string
+    default: ' '
+  - name: bomber_man_service_deploy_enabled
+    displayName: 'Component bomber_man_service'
+    type: boolean
+    default: true
+  - name: bomber_man_service_BuildVersion_override
+    displayName: 'bomber_man_service Build version (optional)'
+    type: string
+    default: ' '
+  - name: islander_app_service_deploy_enabled
+    displayName: 'Component islander_app_service'
+    type: boolean
+    default: true
+  - name: islander_app_service_BuildVersion_override
+    displayName: 'islander_app_service Build version (optional)'
+    type: string
+    default: ' '
+  - name: cricket_app_deploy_enabled
+    displayName: 'Component cricket_app'
+    type: boolean
+    default: true
+  - name: cricket_app_BuildVersion_override
+    displayName: 'cricket_app Build version (optional)'
+    type: string
+    default: ' '
+  - name: checkmate_checkers_deploy_enabled
+    displayName: 'Component checkmate_checkers'
+    type: boolean
+    default: true
+  - name: checkmate_checkers_BuildVersion_override
+    displayName: 'checkmate_checkers Build version (optional)'
+    type: string
+    default: ' '
+  - name: baseball_game_service_deploy_enabled
+    displayName: 'Component baseball_game_service'
+    type: boolean
+    default: true
+  - name: baseball_game_service_BuildVersion_override
+    displayName: 'baseball_game_service Build version (optional)'
+    type: string
+    default: ' '
+  - name: pokeman_game_deploy_enabled
+    displayName: 'Component pokeman_game'
+    type: boolean
+    default: true
+  - name: pokeman_game_BuildVersion_override
+    displayName: 'pokeman_game Build version (optional)'
+    type: string
+    default: ' '
+  - name: popeye-service_deploy_enabled
+    displayName: 'Component popeye-service'
+    type: boolean
+    default: true
+  - name: popeye-service_BuildVersion_override
+    displayName: 'popeye-service Build version (optional)'
+    type: string
+    default: ' '
+  - name: main_terraform_deploy_enabled
+    displayName: 'Component main_terraform'
+    type: boolean
+    default: true
+  - name: main_terraform_BuildVersion_override
+    displayName: 'main_terraform Build version (optional)'
+    type: string
+    default: ' '
   - name: prodActiveRegion
     displayName: 'Prod active region'
     type: string
     default: 'EAST-ACTIVE-WEST-PASSIVE'
     values:
-      - 'EAST-ACTIVE-WEST-PASSIVE'
-      - 'WEST-ACTIVE-EAST-PASSIVE'
+      - EAST-ACTIVE-WEST-PASSIVE
+      - WEST-ACTIVE-EAST-PASSIVE
 
 variables:
-  - group: ${{ parameters.variableGroupName }}
-  - name: branchName
-    value: ${{ parameters.branchName }}
-  - name: prevReleaseBranch
-    value: ${{ parameters.prevReleaseBranch }}
-  - name: githubOwner
-    value: ${{ parameters.githubOwner }}
-  - name: prodActiveRegion
-    value: ${{ parameters.prodActiveRegion }}
   - name: repoList
-    value: 'repo-1,repo-2,repo-3,repo-4,repo-5,repo-6,repo-7,repo-8,repo-9,repo-10'
+    value: 'mario_service,contra_app,bomber_man_service,islander_app_service,cricket_app,checkmate_checkers,baseball_game_service,pokeman_game,popeye-service,main_terraform'
 
 stages:
   - stage: Validate
@@ -57,10 +123,10 @@ stages:
           name: 'Default'
         steps:
           - script: |
-              echo "Branch name: $(branchName)"
-              echo "Previous release branch: $(prevReleaseBranch)"
-              echo "GitHub owner: $(githubOwner)"
-              echo "Components enabled: repo-1=$(repo1Enabled) repo-2=$(repo2Enabled) repo-3=$(repo3Enabled) repo-4=$(repo4Enabled) repo-5=$(repo5Enabled) repo-6=$(repo6Enabled) repo-7=$(repo7Enabled) repo-8=$(repo8Enabled) repo-9=$(repo9Enabled) repo-10=$(repo10Enabled)"
+              echo "Branch name: ${{ parameters.branchName }}"
+              echo "Previous release branch: ${{ parameters.prevReleaseBranch }}"
+              echo "GitHub owner: ${{ parameters.githubOwner }}"
+              echo "Components enabled: mario_service=${{ parameters.mario_service_deploy_enabled }} contra_app=${{ parameters.contra_app_deploy_enabled }} bomber_man_service=${{ parameters.bomber_man_service_deploy_enabled }} islander_app_service=${{ parameters.islander_app_service_deploy_enabled }} cricket_app=${{ parameters.cricket_app_deploy_enabled }} checkmate_checkers=${{ parameters.checkmate_checkers_deploy_enabled }} baseball_game_service=${{ parameters.baseball_game_service_deploy_enabled }} pokeman_game=${{ parameters.pokeman_game_deploy_enabled }} popeye-service=${{ parameters.popeye-service_deploy_enabled }} main_terraform=${{ parameters.main_terraform_deploy_enabled }}"
             displayName: 'Show parameters'
 
   - stage: CreateBranch
@@ -68,7 +134,7 @@ stages:
     dependsOn: Validate
     jobs:
       - job: CreateBranchInAllRepos
-        displayName: 'Create branch across repo-1 to repo-10'
+        displayName: 'Create branch across all 10 components'
         pool:
           name: 'Default'
         steps:
@@ -80,11 +146,11 @@ stages:
               targetType: 'inline'
               script: |
                 $ErrorActionPreference = "Stop"
-                $branchName = "$(branchName)"
-                $prevReleaseBranch = "$(prevReleaseBranch)"
-                $owner = "$(githubOwner)"
+                $branchName = "${{ parameters.branchName }}"
+                $prevReleaseBranch = "${{ parameters.prevReleaseBranch }}"
+                $owner = "${{ parameters.githubOwner }}"
                 # Stage 2 only: create branch in all 10 components regardless of enabled/disabled
-                $repos = @("repo-1", "repo-2", "repo-3", "repo-4", "repo-5", "repo-6", "repo-7", "repo-8", "repo-9", "repo-10")
+                $repos = @("mario_service", "contra_app", "bomber_man_service", "islander_app_service", "cricket_app", "checkmate_checkers", "baseball_game_service", "pokeman_game", "popeye-service", "main_terraform")
                 $baseUrl = "https://api.github.com"
 
                 if (-not $env:GITHUB_TOKEN) {
@@ -154,19 +220,19 @@ stages:
                     targetType: 'inline'
                     script: |
                       $ErrorActionPreference = "Stop"
-                      $owner = "$(githubOwner)"
-                      $branchName = "$(branchName)"
+                      $owner = "${{ parameters.githubOwner }}"
+                      $branchName = "${{ parameters.branchName }}"
                       $repos = @()
-                      if ("$(repo1Enabled)" -eq "True") { $repos += "repo-1" }
-                      if ("$(repo2Enabled)" -eq "True") { $repos += "repo-2" }
-                      if ("$(repo3Enabled)" -eq "True") { $repos += "repo-3" }
-                      if ("$(repo4Enabled)" -eq "True") { $repos += "repo-4" }
-                      if ("$(repo5Enabled)" -eq "True") { $repos += "repo-5" }
-                      if ("$(repo6Enabled)" -eq "True") { $repos += "repo-6" }
-                      if ("$(repo7Enabled)" -eq "True") { $repos += "repo-7" }
-                      if ("$(repo8Enabled)" -eq "True") { $repos += "repo-8" }
-                      if ("$(repo9Enabled)" -eq "True") { $repos += "repo-9" }
-                      if ("$(repo10Enabled)" -eq "True") { $repos += "repo-10" }
+                      if ("${{ parameters.mario_service_deploy_enabled }}" -eq "True") { $repos += "mario_service" }
+                      if ("${{ parameters.contra_app_deploy_enabled }}" -eq "True") { $repos += "contra_app" }
+                      if ("${{ parameters.bomber_man_service_deploy_enabled }}" -eq "True") { $repos += "bomber_man_service" }
+                      if ("${{ parameters.islander_app_service_deploy_enabled }}" -eq "True") { $repos += "islander_app_service" }
+                      if ("${{ parameters.cricket_app_deploy_enabled }}" -eq "True") { $repos += "cricket_app" }
+                      if ("${{ parameters.checkmate_checkers_deploy_enabled }}" -eq "True") { $repos += "checkmate_checkers" }
+                      if ("${{ parameters.baseball_game_service_deploy_enabled }}" -eq "True") { $repos += "baseball_game_service" }
+                      if ("${{ parameters.pokeman_game_deploy_enabled }}" -eq "True") { $repos += "pokeman_game" }
+                      if ("${{ parameters.popeye-service_deploy_enabled }}" -eq "True") { $repos += "popeye-service" }
+                      if ("${{ parameters.main_terraform_deploy_enabled }}" -eq "True") { $repos += "main_terraform" }
                       $baseUrl = "https://api.github.com"
                       $outputLines = @()
 
@@ -185,16 +251,16 @@ stages:
                       $branchEncoded = [System.Uri]::EscapeDataString($branchName)
 
                       $buildVersionOverride = @{
-                        "repo-1" = "$(repo1BuildVersion)"
-                        "repo-2" = "$(repo2BuildVersion)"
-                        "repo-3" = "$(repo3BuildVersion)"
-                        "repo-4" = "$(repo4BuildVersion)"
-                        "repo-5" = "$(repo5BuildVersion)"
-                        "repo-6" = "$(repo6BuildVersion)"
-                        "repo-7" = "$(repo7BuildVersion)"
-                        "repo-8" = "$(repo8BuildVersion)"
-                        "repo-9" = "$(repo9BuildVersion)"
-                        "repo-10" = "$(repo10BuildVersion)"
+                        "mario_service" = "${{ parameters.mario_service_BuildVersion_override }}"
+                        "contra_app" = "${{ parameters.contra_app_BuildVersion_override }}"
+                        "bomber_man_service" = "${{ parameters.bomber_man_service_BuildVersion_override }}"
+                        "islander_app_service" = "${{ parameters.islander_app_service_BuildVersion_override }}"
+                        "cricket_app" = "${{ parameters.cricket_app_BuildVersion_override }}"
+                        "checkmate_checkers" = "${{ parameters.checkmate_checkers_BuildVersion_override }}"
+                        "baseball_game_service" = "${{ parameters.baseball_game_service_BuildVersion_override }}"
+                        "pokeman_game" = "${{ parameters.pokeman_game_BuildVersion_override }}"
+                        "popeye-service" = "${{ parameters.popeye-service_BuildVersion_override }}"
+                        "main_terraform" = "${{ parameters.main_terraform_BuildVersion_override }}"
                       }
 
                       foreach ($repo in $repos) {
@@ -261,7 +327,6 @@ stages:
                     targetPath: '$(Build.ArtifactStagingDirectory)/ci-build-info'
                     artifactName: 'ci-build-info'
                     publishLocation: 'pipeline'
-                    replaceExisting: true
 
   - stage: Promote
     displayName: 'Promote'
@@ -297,8 +362,8 @@ stages:
                 - template: deploy-components.yml
                   parameters:
                     region: 'Stage East'
-                    owner: $(githubOwner)
-                    branchName: $(branchName)
+                    owner: ${{ parameters.githubOwner }}
+                    branchName: ${{ parameters.branchName }}
 
   - stage: stage_west_deploy
     displayName: 'Stage West Deploy'
@@ -321,8 +386,8 @@ stages:
                 - template: deploy-components.yml
                   parameters:
                     region: 'Stage West'
-                    owner: $(githubOwner)
-                    branchName: $(branchName)
+                    owner: ${{ parameters.githubOwner }}
+                    branchName: ${{ parameters.branchName }}
 
   - stage: prod_deploy
     displayName: 'Prod Deploy'
@@ -332,7 +397,7 @@ stages:
     jobs:
       - deployment: DeployProdEastActive
         displayName: 'Prod Deploy (East active, West passive)'
-        condition: eq(variables['prodActiveRegion'], 'EAST-ACTIVE-WEST-PASSIVE')
+        condition: eq('${{ parameters.prodActiveRegion }}', 'EAST-ACTIVE-WEST-PASSIVE')
         environment: 'deploy-prod'
         pool:
           name: 'Default'
@@ -348,18 +413,16 @@ stages:
                 - template: deploy-components.yml
                   parameters:
                     region: 'Prod West'
-                    owner: $(githubOwner)
-                    branchName: $(branchName)
-                    includeParse: true
+                    owner: ${{ parameters.githubOwner }}
+                    branchName: ${{ parameters.branchName }}
                 - template: deploy-components.yml
                   parameters:
                     region: 'Prod East'
-                    owner: $(githubOwner)
-                    branchName: $(branchName)
-                    includeParse: false
+                    owner: ${{ parameters.githubOwner }}
+                    branchName: ${{ parameters.branchName }}
       - deployment: DeployProdWestActive
         displayName: 'Prod Deploy (West active, East passive)'
-        condition: eq(variables['prodActiveRegion'], 'WEST-ACTIVE-EAST-PASSIVE')
+        condition: eq('${{ parameters.prodActiveRegion }}', 'WEST-ACTIVE-EAST-PASSIVE')
         environment: 'deploy-prod'
         pool:
           name: 'Default'
@@ -375,12 +438,10 @@ stages:
                 - template: deploy-components.yml
                   parameters:
                     region: 'Prod East'
-                    owner: $(githubOwner)
-                    branchName: $(branchName)
-                    includeParse: true
+                    owner: ${{ parameters.githubOwner }}
+                    branchName: ${{ parameters.branchName }}
                 - template: deploy-components.yml
                   parameters:
                     region: 'Prod West'
-                    owner: $(githubOwner)
-                    branchName: $(branchName)
-                    includeParse: false
+                    owner: ${{ parameters.githubOwner }}
+                    branchName: ${{ parameters.branchName }}
