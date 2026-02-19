@@ -146,6 +146,15 @@ stages:
             deploy:
               steps:
                 - task: PowerShell@2
+                  name: SetArtifactName
+                  displayName: 'Set unique artifact name (avoids conflict on rerun)'
+                  inputs:
+                    targetType: 'inline'
+                    script: |
+                      $name = "ci-build-info-$(Build.BuildId)-$(System.JobAttempt)"
+                      Write-Host "##vso[task.setvariable variable=ArtifactName;isOutput=true]$name"
+                      Write-Host "Artifact name: $name"
+                - task: PowerShell@2
                   displayName: 'Get latest CI run and artifact version from all repos'
                   env:
                     GITHUB_TOKEN: $(GITHUB_TOKEN)
@@ -270,9 +279,8 @@ stages:
                   displayName: 'Publish build info file'
                   inputs:
                     targetPath: '$(Build.ArtifactStagingDirectory)/ci-build-info'
-                    artifactName: 'ci-build-info'
+                    artifactName: $(SetArtifactName.ArtifactName)
                     publishLocation: 'pipeline'
-                    replaceExisting: true
 
   - stage: Promote
     displayName: 'Promote'
@@ -304,28 +312,26 @@ stages:
               notifyUsers: ''
               instructions: 'Approve to start Stage East Deploy. Resume when ready.'
               onTimeout: 'reject'
-      - deployment: DeployStageEast
+      - job: DeployStageEast
         displayName: 'Deploy to Stage East'
         dependsOn: WaitForApproval
-        environment: 'deploy-stage-east'
         pool:
           name: 'Default'
-        strategy:
-          runOnce:
-            deploy:
-              steps:
-                - download: none
-                  displayName: 'Disable default artifact download (we download one artifact explicitly)'
-                - task: DownloadPipelineArtifact@2
-                  displayName: 'Download ci-build-info artifact'
-                  inputs:
-                    artifactName: 'ci-build-info'
-                    targetPath: '$(Pipeline.Workspace)/ci-build-info'
-                - template: deploy-components.yml
-                  parameters:
-                    region: 'Stage East'
-                    owner: $(githubOwner)
-                    branchName: $(branchName)
+        variables:
+          ciArtifactName: $[ dependencies.GatherBuildInfo.outputs['SetArtifactName.ArtifactName'] ]
+        steps:
+          - download: none
+            displayName: 'Disable default artifact download (we download one artifact explicitly)'
+          - task: DownloadPipelineArtifact@2
+            displayName: 'Download ci-build-info artifact'
+            inputs:
+              artifactName: $(ciArtifactName)
+              targetPath: '$(Pipeline.Workspace)/ci-build-info'
+          - template: deploy-components.yml
+            parameters:
+              region: 'Stage East'
+              owner: $(githubOwner)
+              branchName: $(branchName)
 
   - stage: stage_west_deploy
     displayName: 'Stage West Deploy'
@@ -344,28 +350,26 @@ stages:
               notifyUsers: ''
               instructions: 'Approve to start Stage West Deploy. Resume when ready.'
               onTimeout: 'reject'
-      - deployment: DeployStageWest
+      - job: DeployStageWest
         displayName: 'Deploy to Stage West'
         dependsOn: WaitForApproval
-        environment: 'deploy-stage-west'
         pool:
           name: 'Default'
-        strategy:
-          runOnce:
-            deploy:
-              steps:
-                - download: none
-                  displayName: 'Disable default artifact download (we download one artifact explicitly)'
-                - task: DownloadPipelineArtifact@2
-                  displayName: 'Download ci-build-info artifact'
-                  inputs:
-                    artifactName: 'ci-build-info'
-                    targetPath: '$(Pipeline.Workspace)/ci-build-info'
-                - template: deploy-components.yml
-                  parameters:
-                    region: 'Stage West'
-                    owner: $(githubOwner)
-                    branchName: $(branchName)
+        variables:
+          ciArtifactName: $[ dependencies.GatherBuildInfo.outputs['SetArtifactName.ArtifactName'] ]
+        steps:
+          - download: none
+            displayName: 'Disable default artifact download (we download one artifact explicitly)'
+          - task: DownloadPipelineArtifact@2
+            displayName: 'Download ci-build-info artifact'
+            inputs:
+              artifactName: $(ciArtifactName)
+              targetPath: '$(Pipeline.Workspace)/ci-build-info'
+          - template: deploy-components.yml
+            parameters:
+              region: 'Stage West'
+              owner: $(githubOwner)
+              branchName: $(branchName)
 
   - stage: prod_deploy
     displayName: 'Prod Deploy'
@@ -384,63 +388,59 @@ stages:
               notifyUsers: ''
               instructions: 'Approve to start Prod Deploy. Resume when ready.'
               onTimeout: 'reject'
-      - deployment: DeployProdEastActive
+      - job: DeployProdEastActive
         displayName: 'Prod Deploy (East active, West passive)'
         dependsOn: WaitForApproval
         condition: eq(variables['prodActiveRegion'], 'EAST-ACTIVE-WEST-PASSIVE')
-        environment: 'deploy-prod'
         pool:
           name: 'Default'
-        strategy:
-          runOnce:
-            deploy:
-              steps:
-                - download: none
-                  displayName: 'Disable default artifact download (we download one artifact explicitly)'
-                - task: DownloadPipelineArtifact@2
-                  displayName: 'Download ci-build-info artifact'
-                  inputs:
-                    artifactName: 'ci-build-info'
-                    targetPath: '$(Pipeline.Workspace)/ci-build-info'
-                - template: deploy-components.yml
-                  parameters:
-                    region: 'Prod West'
-                    owner: $(githubOwner)
-                    branchName: $(branchName)
-                    includeParse: true
-                - template: deploy-components.yml
-                  parameters:
-                    region: 'Prod East'
-                    owner: $(githubOwner)
-                    branchName: $(branchName)
-                    includeParse: false
-      - deployment: DeployProdWestActive
+        variables:
+          ciArtifactName: $[ dependencies.GatherBuildInfo.outputs['SetArtifactName.ArtifactName'] ]
+        steps:
+          - download: none
+            displayName: 'Disable default artifact download (we download one artifact explicitly)'
+          - task: DownloadPipelineArtifact@2
+            displayName: 'Download ci-build-info artifact'
+            inputs:
+              artifactName: $(ciArtifactName)
+              targetPath: '$(Pipeline.Workspace)/ci-build-info'
+          - template: deploy-components.yml
+            parameters:
+              region: 'Prod West'
+              owner: $(githubOwner)
+              branchName: $(branchName)
+              includeParse: true
+          - template: deploy-components.yml
+            parameters:
+              region: 'Prod East'
+              owner: $(githubOwner)
+              branchName: $(branchName)
+              includeParse: false
+      - job: DeployProdWestActive
         displayName: 'Prod Deploy (West active, East passive)'
         dependsOn: WaitForApproval
         condition: eq(variables['prodActiveRegion'], 'WEST-ACTIVE-EAST-PASSIVE')
-        environment: 'deploy-prod'
         pool:
           name: 'Default'
-        strategy:
-          runOnce:
-            deploy:
-              steps:
-                - download: none
-                  displayName: 'Disable default artifact download (we download one artifact explicitly)'
-                - task: DownloadPipelineArtifact@2
-                  displayName: 'Download ci-build-info artifact'
-                  inputs:
-                    artifactName: 'ci-build-info'
-                    targetPath: '$(Pipeline.Workspace)/ci-build-info'
-                - template: deploy-components.yml
-                  parameters:
-                    region: 'Prod East'
-                    owner: $(githubOwner)
-                    branchName: $(branchName)
-                    includeParse: true
-                - template: deploy-components.yml
-                  parameters:
-                    region: 'Prod West'
-                    owner: $(githubOwner)
-                    branchName: $(branchName)
-                    includeParse: false
+        variables:
+          ciArtifactName: $[ dependencies.GatherBuildInfo.outputs['SetArtifactName.ArtifactName'] ]
+        steps:
+          - download: none
+            displayName: 'Disable default artifact download (we download one artifact explicitly)'
+          - task: DownloadPipelineArtifact@2
+            displayName: 'Download ci-build-info artifact'
+            inputs:
+              artifactName: $(ciArtifactName)
+              targetPath: '$(Pipeline.Workspace)/ci-build-info'
+          - template: deploy-components.yml
+            parameters:
+              region: 'Prod East'
+              owner: $(githubOwner)
+              branchName: $(branchName)
+              includeParse: true
+          - template: deploy-components.yml
+            parameters:
+              region: 'Prod West'
+              owner: $(githubOwner)
+              branchName: $(branchName)
+              includeParse: false
