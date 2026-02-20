@@ -267,10 +267,14 @@ stages:
                         }
                       }
 
-                      if ("$(mario_service_terraform)" -eq "True") {
-                        $outputLines += "mario_service_terraform - $branchName"
-                        Write-Host "mario_service_terraform - $branchName (from variable group)" -ForegroundColor Green
-                      }
+                      if ("$(mario_service_terraform)" -eq "True") { $outputLines += "mario_service_terraform - $branchName"; Write-Host "mario_service_terraform - $branchName (from variable group)" -ForegroundColor Green }
+                      if ("$(contra_app_terraform)" -eq "True") { $outputLines += "contra_app_terraform - $branchName"; Write-Host "contra_app_terraform - $branchName (from variable group)" -ForegroundColor Green }
+                      if ("$(bomber_man_service_terraform)" -eq "True") { $outputLines += "bomber_man_service_terraform - $branchName"; Write-Host "bomber_man_service_terraform - $branchName (from variable group)" -ForegroundColor Green }
+                      if ("$(islander_app_service_terraform)" -eq "True") { $outputLines += "islander_app_service_terraform - $branchName"; Write-Host "islander_app_service_terraform - $branchName (from variable group)" -ForegroundColor Green }
+                      if ("$(cricket_app_terraform)" -eq "True") { $outputLines += "cricket_app_terraform - $branchName"; Write-Host "cricket_app_terraform - $branchName (from variable group)" -ForegroundColor Green }
+                      if ("$(checkmate_checkers_terraform)" -eq "True") { $outputLines += "checkmate_checkers_terraform - $branchName"; Write-Host "checkmate_checkers_terraform - $branchName (from variable group)" -ForegroundColor Green }
+                      if ("$(baseball_game_service_terraform)" -eq "True") { $outputLines += "baseball_game_service_terraform - $branchName"; Write-Host "baseball_game_service_terraform - $branchName (from variable group)" -ForegroundColor Green }
+                      if ("$(pokeman_game_terraform)" -eq "True") { $outputLines += "pokeman_game_terraform - $branchName"; Write-Host "pokeman_game_terraform - $branchName (from variable group)" -ForegroundColor Green }
 
                       # Write output file
                       $outDir = "$(Build.ArtifactStagingDirectory)/ci-build-info"
