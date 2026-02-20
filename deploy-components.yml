@@ -42,20 +42,20 @@ steps:
           }
   - task: PowerShell@2
     displayName: 'Deploy mario_service_terraform in ${{ parameters.region }}'
-    condition: eq(variables['mario_service_terraform_enabled'], 'true')
+    condition: eq(variables['mario_service_terraform'], 'true')
     env:
       GITHUB_TOKEN: $(GITHUB_TOKEN)
     inputs:
       targetType: 'inline'
       script: |
         $ErrorActionPreference = "Stop"
-        $repo = "mario_service"; $workflowFileName = "terraform"
+        $repo = "mario_service"
         $owner = "${{ parameters.owner }}"; $branchName = "${{ parameters.branchName }}"; $region = "${{ parameters.region }}"
         $baseUrl = "https://api.github.com"
         $headers = @{ "Authorization" = "token $($env:GITHUB_TOKEN)"; "Accept" = "application/vnd.github.v3+json" }
         $workflows = Invoke-RestMethod -Uri "$baseUrl/repos/$owner/$repo/actions/workflows" -Headers $headers -Method Get
-        $tfWf = $workflows.workflows | Where-Object { $_.path -match "$workflowFileName\.(yaml|yml)$" } | Select-Object -First 1
-        if (-not $tfWf) { Write-Error "Repo $repo : No workflow matching $workflowFileName.yaml/yml in .github/workflows. Add the file and ensure it has 'workflow_dispatch:' under 'on:'." }
+        $tfWf = $workflows.workflows | Where-Object { $_.path -like '*terraform.yml' -or $_.path -like '*terraform.yaml' } | Select-Object -First 1
+        if (-not $tfWf) { Write-Error "Repo $repo : No workflow matching terraform.yml in .github/workflows. Add the file and ensure it has 'workflow_dispatch:' under 'on:'." }
         $body = @{ ref = $branchName } | ConvertTo-Json
         try { Invoke-RestMethod -Uri "$baseUrl/repos/$owner/$repo/actions/workflows/$($tfWf.id)/dispatches" -Headers $headers -Method Post -Body $body -ContentType "application/json" } catch { Write-Error "Dispatch failed for $repo terraform. $_" }
         Write-Host "Triggered mario_service_terraform - ${region}. Waiting..." -ForegroundColor Green
