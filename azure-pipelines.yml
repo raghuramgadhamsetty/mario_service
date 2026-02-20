@@ -467,16 +467,22 @@ stages:
               includeParse: true
           - script: 'echo "Dummy: Enable logic apps in prod-west"'
             displayName: '7. Enable logic apps in prod-west'
+            condition: always()
           - script: 'echo "Dummy: DB failover to prod-west"'
             displayName: '8. DB failover to prod-west'
+            condition: always()
           - script: 'echo "Dummy: Change traffic to prod-west"'
             displayName: '9. Change traffic to prod-west'
+            condition: always()
           - script: 'echo "Dummy: Validations on prod-west"'
             displayName: '10. Validations on prod-west'
+            condition: always()
           - script: 'echo "Dummy: Disable logic apps in west region"'
             displayName: '11. Disable logic apps in west region'
+            condition: always()
           - script: 'echo "Dummy: Add Azure secrets and vault secrets in prod-east"'
             displayName: '12. Add Azure secrets and vault secrets in prod-east'
+            condition: always()
           # 13. Deploy components to Prod East (artifact already downloaded at step 6)
           - template: deploy-components.yml
             parameters:
@@ -486,12 +492,16 @@ stages:
               includeParse: false
           - script: 'echo "Dummy: Enable logic apps in prod-east"'
             displayName: '14. Enable logic apps in prod-east'
+            condition: always()
           - script: 'echo "Dummy: DB failover to prod-east"'
             displayName: '15. DB failover to prod-east'
+            condition: always()
           - script: 'echo "Dummy: Change traffic to prod-east"'
             displayName: '16. Change traffic to prod-east'
+            condition: always()
           - script: 'echo "Dummy: Validations on prod-east"'
             displayName: '17. Validations on prod-east'
+            condition: always()
       - job: DeployProdWestActive
         displayName: 'Prod Deploy (West active, East passive)'
         dependsOn: WaitForApproval
@@ -538,16 +548,22 @@ stages:
               includeParse: true
           - script: 'echo "Dummy: Enable logic apps in prod-east"'
             displayName: '7. Enable logic apps in prod-east'
+            condition: always()
           - script: 'echo "Dummy: DB failover to prod-east"'
             displayName: '8. DB failover to prod-east'
+            condition: always()
           - script: 'echo "Dummy: Change traffic to prod-east"'
             displayName: '9. Change traffic to prod-east'
+            condition: always()
           - script: 'echo "Dummy: Validations on prod-east"'
             displayName: '10. Validations on prod-east'
+            condition: always()
           - script: 'echo "Dummy: Disable logic apps in east region"'
             displayName: '11. Disable logic apps in east region'
+            condition: always()
           - script: 'echo "Dummy: Add Azure secrets and vault secrets in prod-west"'
             displayName: '12. Add Azure secrets and vault secrets in prod-west'
+            condition: always()
           # 13. Deploy components to Prod West (artifact already downloaded at step 6)
           - template: deploy-components.yml
             parameters:
@@ -557,9 +573,13 @@ stages:
               includeParse: false
           - script: 'echo "Dummy: Enable logic apps in prod-west"'
             displayName: '14. Enable logic apps in prod-west'
+            condition: always()
           - script: 'echo "Dummy: DB failover to prod-west"'
             displayName: '15. DB failover to prod-west'
+            condition: always()
           - script: 'echo "Dummy: Change traffic to prod-west"'
             displayName: '16. Change traffic to prod-west'
+            condition: always()
           - script: 'echo "Dummy: Validations on prod-west"'
             displayName: '17. Validations on prod-west'
+            condition: always()
