@@ -267,6 +267,11 @@ stages:
                         }
                       }
 
+                      if ("$(mario_service_terraform_enabled)" -eq "True") {
+                        $outputLines += "mario_service_terraform_enabled - true"
+                        Write-Host "mario_service_terraform_enabled - true (from variable group)" -ForegroundColor Green
+                      }
+
                       # Write output file
                       $outDir = "$(Build.ArtifactStagingDirectory)/ci-build-info"
                       New-Item -ItemType Directory -Path $outDir -Force | Out-Null
