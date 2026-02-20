@@ -26,13 +26,13 @@ parameters:
       - 'EAST-ACTIVE-WEST-PASSIVE'
       - 'WEST-ACTIVE-EAST-PASSIVE'
   - name: stageSecretsVariableGroup
-    displayName: 'Set Stage secrets variable group'
+    displayName: 'Set Stage secrets variable group (optional)'
     type: string
-    default: ''
+    default: '(optional)'
   - name: prodSecretsVariableGroup
-    displayName: 'Set Prod secrets variable group'
+    displayName: 'Set Prod secrets variable group (optional)'
     type: string
-    default: ''
+    default: '(optional)'
 
 variables:
   - group: ${{ parameters.variableGroupName }}
@@ -318,7 +318,7 @@ stages:
       - Promote
       - GatherCIBuildInfo
     variables:
-      - ${{ if ne(parameters.stageSecretsVariableGroup, '') }}:
+      - ${{ if and(ne(parameters.stageSecretsVariableGroup, ''), ne(parameters.stageSecretsVariableGroup, '(optional)')) }}:
         - group: ${{ parameters.stageSecretsVariableGroup }}
     jobs:
       - job: WaitForApproval
@@ -380,7 +380,7 @@ stages:
       - Promote
       - GatherCIBuildInfo
     variables:
-      - ${{ if ne(parameters.stageSecretsVariableGroup, '') }}:
+      - ${{ if and(ne(parameters.stageSecretsVariableGroup, ''), ne(parameters.stageSecretsVariableGroup, '(optional)')) }}:
         - group: ${{ parameters.stageSecretsVariableGroup }}
     jobs:
       - job: WaitForApproval
@@ -404,7 +404,7 @@ stages:
             displayName: 'Disable default artifact download (we download one artifact explicitly)'
           - task: PowerShell@2
             displayName: 'Read Stage secrets variable group (placeholder)'
-            condition: ne(variables['stageSecretsVariableGroup'], '')
+            condition: and(ne(variables['stageSecretsVariableGroup'], ''), ne(variables['stageSecretsVariableGroup'], '(optional)'))
             inputs:
               targetType: 'inline'
               script: |
@@ -442,7 +442,7 @@ stages:
       - Promote
       - GatherCIBuildInfo
     variables:
-      - ${{ if ne(parameters.prodSecretsVariableGroup, '') }}:
+      - ${{ if and(ne(parameters.prodSecretsVariableGroup, ''), ne(parameters.prodSecretsVariableGroup, '(optional)')) }}:
         - group: ${{ parameters.prodSecretsVariableGroup }}
     jobs:
       - job: WaitForApproval
@@ -488,7 +488,7 @@ stages:
             displayName: '4. Run db scripts'
           - task: PowerShell@2
             displayName: '5. Add Azure secrets and vault secrets in prod-west'
-            condition: always()
+            condition: and(always(), ne(variables['prodSecretsVariableGroup'], '(optional)'), ne(variables['prodSecretsVariableGroup'], ''))
             inputs:
               targetType: 'inline'
               script: |
@@ -576,7 +576,7 @@ stages:
             displayName: '4. Run db scripts'
           - task: PowerShell@2
             displayName: '5. Add Azure secrets and vault secrets in prod-east'
-            condition: always()
+            condition: and(always(), ne(variables['prodSecretsVariableGroup'], '(optional)'), ne(variables['prodSecretsVariableGroup'], ''))
             inputs:
               targetType: 'inline'
               script: |
