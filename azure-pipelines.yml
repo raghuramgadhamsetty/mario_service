@@ -1,5 +1,5 @@
 # Pipeline: Create a branch in all 10 GitHub repos (mario_service, contra_app, ...)
-# Pipeline inputs: variableGroupName, branchName, prevReleaseBranch, githubOwner, prodActiveRegion.
+# Pipeline inputs: variableGroupName, branchName, prevReleaseBranch, prodActiveRegion. githubOwner is hardcoded.
 # Component deploy enabled and BuildVersion override come from the variable group (e.g. RELEASE_03_20).
 
 name: ReleasePipeline-$(Build.BuildId)-$(Date:yyyyMMddHHmmss)
@@ -18,9 +18,6 @@ parameters:
     displayName: 'Previous release branch (create new branch from this)'
     type: string
     default: main
-  - name: githubOwner
-    displayName: 'GitHub owner/username'
-    type: string
   - name: prodActiveRegion
     displayName: 'Prod active region'
     type: string
@@ -48,7 +45,7 @@ variables:
   - name: prevReleaseBranch
     value: ${{ parameters.prevReleaseBranch }}
   - name: githubOwner
-    value: ${{ parameters.githubOwner }}
+    value: 'raghuramgadhamsetty'
   - name: prodActiveRegion
     value: ${{ parameters.prodActiveRegion }}
   - name: repoList
