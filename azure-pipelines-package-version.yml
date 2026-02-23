@@ -256,46 +256,51 @@ stages:
                           $runStatus = $latestRun.status
                           $runConclusion = $latestRun.conclusion
 
-                          # Get artifacts for latest run on this branch
-                          $artifacts = Invoke-RestMethod -Uri "$baseUrl/repos/$owner/$repo/actions/runs/$runId/artifacts" -Headers $headers -Method Get
+                          # Get "Package Version" from CI job logs (Publish Maven Summary appears in job logs)
                           $buildVersion = "NA"
-                          if ($artifacts.artifacts -and $artifacts.artifacts.Count -gt 0) {
-                            # Prefer "Package Version" from build/publish Maven summary artifact when present
-                            $packageVersionFound = $false
-                            $summaryFirst = $artifacts.artifacts | Where-Object { $_.name -match "summary|maven|build-summary|publish" }
-                            $rest = $artifacts.artifacts | Where-Object { $_.name -notmatch "summary|maven|build-summary|publish" }
-                            $artifactsToTry = @($summaryFirst) + @($rest)
-                            if (-not $artifactsToTry -or $artifactsToTry.Count -eq 0) { $artifactsToTry = @($artifacts.artifacts) }
-                            foreach ($a in $artifactsToTry) {
-                              try {
-                                $zipUrl = "$baseUrl/repos/$owner/$repo/actions/artifacts/$($a.id)/zip"
-                                $zipPath = Join-Path $env:TEMP "artifact_$($a.id)_$repo.zip"
-                                $extractPath = Join-Path $env:TEMP "artifact_$($a.id)_${repo}_extract"
-                                if (Test-Path $extractPath) { Remove-Item $extractPath -Recurse -Force -ErrorAction SilentlyContinue }
-                                Invoke-WebRequest -Uri $zipUrl -Headers $headers -OutFile $zipPath -UseBasicParsing -MaximumRedirection 5
-                                Expand-Archive -Path $zipPath -DestinationPath $extractPath -Force
-                                $files = Get-ChildItem -Path $extractPath -Recurse -File -ErrorAction SilentlyContinue
-                                foreach ($f in $files) {
-                                  try {
-                                    $content = Get-Content -Path $f.FullName -Raw -ErrorAction SilentlyContinue
-                                    if ($content -and $content -match "Package Version\s*[:\-]?\s*([^\r\n]+)") {
-                                      $buildVersion = $Matches[1].Trim()
-                                      $packageVersionFound = $true
-                                      Write-Host "Package Version from $($a.name): $buildVersion" -ForegroundColor Cyan
+                          try {
+                            $jobsResponse = Invoke-RestMethod -Uri "$baseUrl/repos/$owner/$repo/actions/runs/$runId/jobs" -Headers $headers -Method Get
+                            $jobs = $jobsResponse.jobs
+                            if ($jobs -and $jobs.Count -gt 0) {
+                              foreach ($job in $jobs) {
+                                try {
+                                  $jobId = $job.id
+                                  $logsUrl = "$baseUrl/repos/$owner/$repo/actions/jobs/$jobId/logs"
+                                  $tempLogFile = Join-Path $env:TEMP "joblogs_${jobId}_$repo.dat"
+                                  Invoke-WebRequest -Uri $logsUrl -Headers $headers -MaximumRedirection 5 -UseBasicParsing -OutFile $tempLogFile -ErrorAction Stop
+                                  $logContent = $null
+                                  $bytes = [System.IO.File]::ReadAllBytes($tempLogFile)
+                                  $isZip = ($bytes.Length -ge 2 -and $bytes[0] -eq 80 -and $bytes[1] -eq 75)
+                                  if ($isZip) {
+                                    $zipPath = Join-Path $env:TEMP "joblogs_${jobId}_$repo.zip"
+                                    [System.IO.File]::WriteAllBytes($zipPath, $bytes)
+                                    $extractPath = Join-Path $env:TEMP "joblogs_${jobId}_${repo}_ex"
+                                    if (Test-Path $extractPath) { Remove-Item $extractPath -Recurse -Force -ErrorAction SilentlyContinue }
+                                    Expand-Archive -Path $zipPath -DestinationPath $extractPath -Force
+                                    Get-ChildItem -Path $extractPath -Recurse -File | ForEach-Object {
+                                      $txt = Get-Content -Path $_.FullName -Raw -ErrorAction SilentlyContinue
+                                      if ($txt -and $txt -match "Package Version\s*[:\*\s\-]+\s*([^\s\r\n][^\r\n]*)") { $logContent = $txt; break }
+                                    }
+                                    Remove-Item $zipPath -Force -ErrorAction SilentlyContinue
+                                    Remove-Item $extractPath -Recurse -Force -ErrorAction SilentlyContinue
+                                  } else {
+                                    $logContent = [System.IO.File]::ReadAllText($tempLogFile)
+                                  }
+                                  Remove-Item $tempLogFile -Force -ErrorAction SilentlyContinue
+                                  if ($logContent -match "Package Version\s*[:\*\s\-]+\s*([^\s\r\n][^\r\n]*)") {
+                                    $buildVersion = $Matches[1].Trim()
+                                    if ($buildVersion -match "^\d") {
+                                      Write-Host "Package Version from job '$($job.name)' (id $jobId): $buildVersion" -ForegroundColor Cyan
                                       break
                                     }
-                                  } catch {}
+                                  }
+                                } catch {
+                                  # Logs may be unavailable or auth issue, try next job
                                 }
-                                Remove-Item $zipPath -Force -ErrorAction SilentlyContinue
-                                Remove-Item $extractPath -Recurse -Force -ErrorAction SilentlyContinue
-                                if ($packageVersionFound) { break }
-                              } catch {
-                                # Ignore download/extract errors, try next artifact
                               }
                             }
-                            if (-not $packageVersionFound) {
-                              $buildVersion = "NA"
-                            }
+                          } catch {
+                            Write-Host "Could not get job logs for run $runId : $_" -ForegroundColor Yellow
                           }
 
                           $line = "$repo - $buildVersion"
