@@ -80,44 +80,55 @@ steps:
         function Invoke-Terraform([string]$repo) {
           Write-Host "Terraform for $repo in $region" -ForegroundColor Cyan
 
-          $workflows = Invoke-RestMethod -Uri "$baseUrl/repos/$owner/$repo/actions/workflows" -Headers $headers -Method Get
-          $tfWf = $workflows.workflows | Where-Object { $_.path -like "*terraform.yml" -or $_.path -like "*terraform.yaml" } | Select-Object -First 1
-          if (-not $tfWf) {
-            Write-Error "Repo $repo : no terraform.yml/terraform.yaml workflow with workflow_dispatch."
+          try {
+            $workflows = Invoke-RestMethod -Uri "$baseUrl/repos/$owner/$repo/actions/workflows" -Headers $headers -Method Get
+            $tfWf = $workflows.workflows | Where-Object { $_.path -like "*terraform.yml" -or $_.path -like "*terraform.yaml" } | Select-Object -First 1
+            if (-not $tfWf) {
+              Write-Host "Repo $repo : no terraform.yml/terraform.yaml workflow with workflow_dispatch." -ForegroundColor Red
+              return "failure"
+            }
+
+            $body = @{ ref = $branch } | ConvertTo-Json
+            Invoke-RestMethod -Uri "$baseUrl/repos/$owner/$repo/actions/workflows/$($tfWf.id)/dispatches" -Headers $headers -Method Post -Body $body -ContentType "application/json"
+
+            Write-Host "  Triggered terraform for $repo" -ForegroundColor Green
+            Start-Sleep -Seconds 5
+
+            $branchEncoded = [System.Uri]::EscapeDataString($branch)
+            $runs = Invoke-RestMethod -Uri "$baseUrl/repos/$owner/$repo/actions/workflows/$($tfWf.id)/runs?branch=$branchEncoded&per_page=5" -Headers $headers -Method Get
+            $runId = $runs.workflow_runs[0].id
+
+            do {
+              Start-Sleep -Seconds 10
+              $run = Invoke-RestMethod -Uri "$baseUrl/repos/$owner/$repo/actions/runs/$runId" -Headers $headers -Method Get
+              Write-Host "    $repo terraform status: $($run.status)"
+            } while ($run.status -ne "completed")
+
+            if ($run.conclusion -ne "success") {
+              Write-Host "Terraform failed for $repo - $($run.conclusion)" -ForegroundColor Red
+              return "failure"
+            }
+
+            Write-Host "  Terraform succeeded for $repo" -ForegroundColor Green
+            return "success"
           }
-
-          $body = @{ ref = $branch } | ConvertTo-Json
-          Invoke-RestMethod -Uri "$baseUrl/repos/$owner/$repo/actions/workflows/$($tfWf.id)/dispatches" -Headers $headers -Method Post -Body $body -ContentType "application/json"
-
-          Write-Host "  Triggered terraform for $repo" -ForegroundColor Green
-          Start-Sleep -Seconds 5
-
-          $branchEncoded = [System.Uri]::EscapeDataString($branch)
-          $runs = Invoke-RestMethod -Uri "$baseUrl/repos/$owner/$repo/actions/workflows/$($tfWf.id)/runs?branch=$branchEncoded&per_page=5" -Headers $headers -Method Get
-          $runId = $runs.workflow_runs[0].id
-
-          do {
-            Start-Sleep -Seconds 10
-            $run = Invoke-RestMethod -Uri "$baseUrl/repos/$owner/$repo/actions/runs/$runId" -Headers $headers -Method Get
-            Write-Host "    $repo terraform status: $($run.status)"
-          } while ($run.status -ne "completed")
-
-          if ($run.conclusion -ne "success") {
-            Write-Error "Terraform failed for $repo - $($run.conclusion)"
+          catch {
+            Write-Host "Terraform failed for $repo - $($_.Exception.Message)" -ForegroundColor Red
+            return "failure"
           }
-
-          Write-Host "  Terraform succeeded for $repo" -ForegroundColor Green
         }
 
-        # Track deploy results per repo
-        $deployResults = @{}
+        # Track results
+        $terraformResults = @{}   # repo -> success/failure
+        $deployResults    = @{}   # repo -> GitHub conclusion
 
         # ============================ PHASE 1: Terraform ============================
         foreach ($c in $components) {
           $repo = $c.Name
           $tfVar = $c.TerraformVar
           if (Get-TerraformEnabled $tfVar) {
-            Invoke-Terraform $repo
+            $tfStatus = Invoke-Terraform $repo
+            $terraformResults[$repo] = $tfStatus
           } else {
             if ($tfVar) {
               Write-Host "Terraform disabled for $repo (var '$tfVar' != true), skipping."
@@ -141,7 +152,9 @@ steps:
           $workflows = Invoke-RestMethod -Uri "$baseUrl/repos/$owner/$repo/actions/workflows" -Headers $headers -Method Get
           $deployWf = $workflows.workflows | Where-Object { $_.path -match "deploy\.(yaml|yml)$" } | Select-Object -First 1
           if (-not $deployWf) {
-            Write-Error "Repo $repo : no deploy.yaml/yml workflow with workflow_dispatch."
+            Write-Host "Repo $repo : no deploy.yaml/yml workflow with workflow_dispatch." -ForegroundColor Red
+            $deployResults[$repo] = "no_workflow"
+            continue
           }
 
           $body = @{ ref = $branch } | ConvertTo-Json
@@ -157,31 +170,30 @@ steps:
 
         if ($deployRuns.Count -eq 0) {
           Write-Host "No components to deploy in $region (no usable versions)." -ForegroundColor Yellow
-          return
-        }
+        } else {
+          # ================= PHASE 3: Wait for all deploys to finish =================
+          while ($deployRuns.Count -gt 0) {
+            foreach ($repo in @($deployRuns.Keys)) {
+              $runId = $deployRuns[$repo].RunId
+              $run   = Invoke-RestMethod -Uri "$baseUrl/repos/$owner/$repo/actions/runs/$runId" -Headers $headers -Method Get
+              Write-Host "  $repo deploy status: $($run.status)"
 
-        # ================= PHASE 3: Wait for all deploys to finish =================
-        while ($deployRuns.Count -gt 0) {
-          foreach ($repo in @($deployRuns.Keys)) {
-            $runId = $deployRuns[$repo].RunId
-            $run   = Invoke-RestMethod -Uri "$baseUrl/repos/$owner/$repo/actions/runs/$runId" -Headers $headers -Method Get
-            Write-Host "  $repo deploy status: $($run.status)"
+              if ($run.status -eq "completed") {
+                $deployResults[$repo] = $run.conclusion
 
-            if ($run.status -eq "completed") {
-              $deployResults[$repo] = $run.conclusion
+                if ($run.conclusion -ne "success") {
+                  Write-Host "Deploy failed for $repo - $($run.conclusion)" -ForegroundColor Red
+                } else {
+                  Write-Host "Deploy succeeded for $repo" -ForegroundColor Green
+                }
 
-              if ($run.conclusion -ne "success") {
-                Write-Host "Deploy failed for $repo - $($run.conclusion)" -ForegroundColor Red
-              } else {
-                Write-Host "Deploy succeeded for $repo" -ForegroundColor Green
+                $deployRuns.Remove($repo)
               }
-
-              $deployRuns.Remove($repo)
             }
-          }
 
-          if ($deployRuns.Count -gt 0) {
-            Start-Sleep -Seconds 10
+            if ($deployRuns.Count -gt 0) {
+              Start-Sleep -Seconds 10
+            }
           }
         }
 
@@ -189,6 +201,21 @@ steps:
         Write-Host ""
         Write-Host "================ Deployment summary for region: $region =================="
 
+        # Terraform summary: only show repos where terraform actually ran (success or failure)
+        Write-Host ""
+        Write-Host "---- Terraform components ----"
+        foreach ($repo in $terraformResults.Keys) {
+          $tfStatusRaw = $terraformResults[$repo]
+          switch ($tfStatusRaw.ToLowerInvariant()) {
+            "success" { $tfStatus = "Success" }
+            default   { $tfStatus = "Failure ($tfStatusRaw)" }
+          }
+          Write-Host ("Component: {0}_terraform | Status: {1}" -f $repo, $tfStatus)
+        }
+
+        # Application deploy summary (only real versions, no NA/skipped)
+        Write-Host ""
+        Write-Host "---- Application components ----"
         foreach ($c in $components) {
           $repo = $c.Name
 
@@ -205,7 +232,9 @@ steps:
           Write-Host ("Component: {0} | Version: {1} | Status: {2}" -f $repo, $version, $status)
         }
 
-        # Fail the job if any component failed
-        if ($deployResults.Values | Where-Object { $_ -ne "success" }) {
-          Write-Error "One or more component deploys failed. See summary above."
+        # Fail the job if any terraform or app deploy failed
+        $anyTfFail  = $terraformResults.Values | Where-Object { $_ -ne "success" }
+        $anyAppFail = $deployResults.Values    | Where-Object { $_ -ne "success" }
+        if ($anyTfFail -or $anyAppFail) {
+          Write-Error "One or more terraform or component deploys failed. See summary above."
         }
